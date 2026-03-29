@@ -683,12 +683,16 @@ export class DashboardController implements IDashboardController {
       );
       const defaultRoot = workspaceFolder?.uri ?? workspaceFolders[0].uri;
       const defaultPath = vscode.Uri.joinPath(defaultRoot, exportData.filename);
-      const filePath =
-        (await vscode.window.showSaveDialog({
-          defaultUri: defaultPath,
-          saveLabel: 'Export DepPulse Report',
-          filters: exportData.format === 'csv' ? { CSV: ['csv'] } : { JSON: ['json'] },
-        })) ?? defaultPath;
+      const filePath = await vscode.window.showSaveDialog({
+        defaultUri: defaultPath,
+        saveLabel: 'Export DepPulse Report',
+        filters: exportData.format === 'csv' ? { CSV: ['csv'] } : { JSON: ['json'] },
+      });
+
+      if (!filePath) {
+        this.log('Export report canceled by user');
+        return;
+      }
 
       // Write file
       await vscode.workspace.fs.writeFile(filePath, Buffer.from(exportData.content, 'utf8'));
@@ -1003,10 +1007,7 @@ export class DashboardController implements IDashboardController {
   private async detectPackageManagerInRoot(
     rootPath: string
   ): Promise<'npm' | 'pnpm' | 'yarn' | undefined> {
-    const rootUri = {
-      fsPath: rootPath,
-      path: rootPath,
-    } as vscode.Uri;
+    const rootUri = vscode.Uri.file(rootPath);
 
     // Check for pnpm-lock.yaml
     try {
@@ -1060,15 +1061,23 @@ export class DashboardController implements IDashboardController {
       return;
     }
 
+    const packageManagerByScope = new Map<string, Promise<'npm' | 'pnpm' | 'yarn'>>();
     const commands = await Promise.all(
-      bulkData.packages.map(async (pkg) =>
-        this.generateUpdateCommand(
-          await this.detectPackageManager(pkg.packageRoot || pkg.workspaceFolder),
+      bulkData.packages.map(async (pkg) => {
+        const scope = pkg.packageRoot || pkg.workspaceFolder || '';
+        let packageManagerPromise = packageManagerByScope.get(scope);
+        if (!packageManagerPromise) {
+          packageManagerPromise = this.detectPackageManager(scope || undefined);
+          packageManagerByScope.set(scope, packageManagerPromise);
+        }
+
+        return this.generateUpdateCommand(
+          await packageManagerPromise,
           pkg.name,
           pkg.version,
           pkg.packageRoot || pkg.workspaceFolder
-        )
-      )
+        );
+      })
     );
 
     // Execute all commands in sequence

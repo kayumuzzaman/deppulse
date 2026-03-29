@@ -185,4 +185,34 @@ snapshots:
       expect.arrayContaining([expect.objectContaining({ name: 'shared-dep', version: '1.2.3' })])
     );
   });
+
+  it('does not climb above the workspace root when resolving lockfiles', async () => {
+    findFilesMock.mockResolvedValue([{ fsPath: '/repo/packages/app/package.json' }]);
+
+    accessMock.mockImplementation(async (target: string | URL | number) => {
+      const p = target.toString();
+      if (p.endsWith(path.join('/outside', 'pnpm-lock.yaml'))) return;
+      const err = new Error('ENOENT');
+      (err as NodeJS.ErrnoException).code = 'ENOENT';
+      throw err;
+    });
+
+    readFileMock.mockImplementation(async (target: string | Buffer | URL | number) => {
+      const p = target.toString();
+      if (p.endsWith('packages/app/package.json')) {
+        return JSON.stringify({
+          name: 'app-pkg',
+          dependencies: { localdep: '^1.0.0' },
+        });
+      }
+      throw new Error(`Unexpected read ${p}`);
+    });
+
+    const result = await scanner.scan('/repo');
+
+    expect(result.dependencyFiles).toHaveLength(1);
+    expect(result.dependencyFiles[0]?.dependencies).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: 'localdep', version: '1.0.0' })])
+    );
+  });
 });

@@ -190,7 +190,7 @@ export class StaticScanner implements ScannerStrategy {
           const dirPath = path.dirname(fileUri.fsPath);
           let depFile: DependencyFile | null = null;
 
-          const lockfile = await this.resolveLockfile(dirPath);
+          const lockfile = await this.resolveLockfile(dirPath, dir);
           if (lockfile?.type === 'pnpm') {
             try {
               const importerPath = path.relative(path.dirname(lockfile.path), dirPath) || '.';
@@ -389,9 +389,11 @@ export class StaticScanner implements ScannerStrategy {
   }
 
   private async resolveLockfile(
-    packageDir: string
+    packageDir: string,
+    workspaceRoot: string
   ): Promise<{ type: 'pnpm' | 'yarn' | 'npm'; path: string } | null> {
-    let currentDir = packageDir;
+    let currentDir = path.resolve(packageDir);
+    const normalizedWorkspaceRoot = path.resolve(workspaceRoot);
 
     while (true) {
       const pnpmLock = path.join(currentDir, 'pnpm-lock.yaml');
@@ -420,7 +422,10 @@ export class StaticScanner implements ScannerStrategy {
       }
 
       const parentDir = path.dirname(currentDir);
-      if (parentDir === currentDir) {
+      if (
+        parentDir === currentDir ||
+        (currentDir === normalizedWorkspaceRoot && parentDir !== currentDir)
+      ) {
         break;
       }
       currentDir = parentDir;

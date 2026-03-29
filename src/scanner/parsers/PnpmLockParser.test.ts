@@ -151,4 +151,34 @@ snapshots:
     expect(deps[0]?.name).toBe('app-only');
     expect(deps[0]?.packageRoot).toBe('/repo/packages/app');
   });
+
+  it('should keep same dependency/version from different importers as separate entries', async () => {
+    const mockYaml = `
+lockfileVersion: '9.0'
+importers:
+  packages/app-a:
+    dependencies:
+      shared:
+        specifier: ^1.0.0
+        version: 1.2.3
+  packages/app-b:
+    dependencies:
+      shared:
+        specifier: ^1.0.0
+        version: 1.2.3
+packages: {}
+snapshots:
+  shared@1.2.3: {}
+`;
+
+    vi.mocked(fs.readFile).mockResolvedValue(mockYaml);
+
+    const deps = await parser.parse('/repo/pnpm-lock.yaml');
+
+    expect(deps).toHaveLength(2);
+    expect(deps.map((d) => d.packageRoot).sort()).toEqual([
+      '/repo/packages/app-a',
+      '/repo/packages/app-b',
+    ]);
+  });
 });

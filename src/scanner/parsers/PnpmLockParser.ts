@@ -96,7 +96,7 @@ export class PnpmLockParser {
         };
 
         // Avoid infinite recursion / duplicates
-        const uniqueKey = `${name}@${cleanVersion}`;
+        const uniqueKey = `${name}@${cleanVersion}@${packageRoot || ''}`;
         if (processed.has(uniqueKey)) {
           return;
         }

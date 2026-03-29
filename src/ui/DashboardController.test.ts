@@ -61,6 +61,7 @@ vi.mock('vscode', () => {
     },
     Uri: {
       joinPath: vi.fn((base, ...paths) => createMockUri(`${base.path}/${paths.join('/')}`)),
+      file: vi.fn((path: string) => createMockUri(path)),
       parse: vi.fn((uri: string) => createMockUri(uri)),
     },
     workspace: {
@@ -940,6 +941,27 @@ describe('DashboardController - Message Handlers', () => {
           defaultUri: expect.objectContaining({ fsPath: '/workspace-b/deppulse-report.json' }),
         })
       );
+    });
+
+    it('should not write a report when export is canceled', async () => {
+      const mockWorkspaceFolder = { uri: createMockUri('/workspace') };
+      vi.spyOn(vscode.workspace, 'workspaceFolders', 'get').mockReturnValue([
+        mockWorkspaceFolder,
+      ] as unknown as vscode.WorkspaceFolder[]);
+      vi.spyOn(vscode.Uri, 'joinPath').mockReturnValue(createMockUri('/workspace/report.json'));
+      vi.spyOn(vscode.window, 'showSaveDialog').mockResolvedValue(undefined);
+      const writeFileSpy = vi.spyOn(vscode.workspace.fs, 'writeFile').mockResolvedValue();
+
+      await controller.handleMessage({
+        command: 'exportReport',
+        data: {
+          format: 'json',
+          filename: 'report.json',
+          content: '{"test":"data"}',
+        },
+      });
+
+      expect(writeFileSpy).not.toHaveBeenCalled();
     });
 
     it('should handle missing workspace folder', async () => {
