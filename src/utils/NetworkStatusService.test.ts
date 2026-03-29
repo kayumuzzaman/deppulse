@@ -41,6 +41,8 @@ describe('NetworkStatusService', () => {
 
   it('detects network errors from messages', () => {
     expect(NetworkStatusService.isNetworkError('ENOTFOUND registry.npmjs.org')).toBe(true);
+    expect(NetworkStatusService.isNetworkError('No internet connection available')).toBe(true);
+    expect(NetworkStatusService.isNetworkError('network mode mismatch')).toBe(false);
     expect(NetworkStatusService.isNetworkError('some random error')).toBe(false);
   });
 });

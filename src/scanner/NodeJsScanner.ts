@@ -7,6 +7,7 @@ import type {
   ProjectType,
   ScanningStrategy,
 } from '../types';
+import { NetworkStatusService } from '../utils';
 import { BaseDependencyScanner } from './DependencyScanner';
 import { NativeScanner } from './strategies/NativeScanner';
 import type { ScannerStrategy } from './strategies/ScannerStrategy';
@@ -79,13 +80,8 @@ export class NodeJsScanner extends BaseDependencyScanner {
             );
 
             // Determine if the error is network-related or missing dependencies
-            const errorMessage = String(error);
-            const isNetworkError =
-              errorMessage.includes('ENOTFOUND') ||
-              errorMessage.includes('ETIMEDOUT') ||
-              errorMessage.includes('ECONNREFUSED') ||
-              errorMessage.includes('getaddrinfo') ||
-              errorMessage.includes('network');
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            const isNetworkError = NetworkStatusService.isNetworkError(errorMessage);
 
             const isMissingDependencies =
               errorMessage.includes('ELSPROBLEMS') ||
@@ -132,9 +128,11 @@ export class NodeJsScanner extends BaseDependencyScanner {
    * Watches for changes to package.json files
    */
   watchForChanges(callback: (changes: FileChange[]) => void): vscode.Disposable {
-    this.log('info', 'Setting up file watcher for package.json');
+    this.log('info', 'Setting up file watcher for package.json and lockfiles');
 
-    const watcher = vscode.workspace.createFileSystemWatcher('**/package.json');
+    const watcher = vscode.workspace.createFileSystemWatcher(
+      '**/{package.json,package-lock.json,pnpm-lock.yaml,yarn.lock}'
+    );
 
     const handleChange = (uri: vscode.Uri, type: 'created' | 'modified' | 'deleted') => {
       // Ignore changes in node_modules
