@@ -1,4 +1,5 @@
 import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import * as yaml from 'js-yaml';
 import { type Dependency, DepPulseError, ErrorCode } from '../../types';
 import { Logger } from '../../utils/Logger';
@@ -30,7 +31,7 @@ interface PnpmLockfile {
 export class PnpmLockParser {
   private logger = Logger.getInstance();
 
-  async parse(lockfilePath: string): Promise<Dependency[]> {
+  async parse(lockfilePath: string, importerPath?: string): Promise<Dependency[]> {
     this.logger.info(`Parsing pnpm-lock.yaml: ${lockfilePath}`);
 
     try {
@@ -41,11 +42,24 @@ export class PnpmLockParser {
         throw new Error('Invalid lockfile format');
       }
 
-      // Support for pnpm-lock.yaml v9.0
-      // We focus on the root importer '.'
-      const rootImporter = lockfile.importers?.['.'];
-      if (!rootImporter) {
-        this.logger.warn('No root importer found in pnpm-lock.yaml');
+      const importers = lockfile.importers ?? {};
+      type Importer = NonNullable<PnpmLockfile['importers']>[string];
+      const normalizedImporterPath =
+        importerPath !== undefined ? this.normalizeImporterPath(importerPath) : undefined;
+      const importerEntries: Array<[string, Importer | undefined]> =
+        normalizedImporterPath !== undefined
+          ? [[normalizedImporterPath, importers[normalizedImporterPath]]]
+          : Object.entries(importers);
+      const availableImporters = importerEntries.filter((entry): entry is [string, Importer] =>
+        Boolean(entry[1])
+      );
+
+      if (availableImporters.length === 0) {
+        this.logger.warn(
+          normalizedImporterPath
+            ? `Importer "${normalizedImporterPath}" not found in pnpm-lock.yaml`
+            : 'No importers found in pnpm-lock.yaml'
+        );
         return [];
       }
 
@@ -57,7 +71,8 @@ export class PnpmLockParser {
         name: string,
         versionOrRef: string,
         isDev: boolean,
-        isTransitive: boolean
+        isTransitive: boolean,
+        packageRoot?: string
       ): void => {
         // In pnpm lockfile v9, the version field in importers often looks like:
         // "1.4.0" or "5.2.2(react-hook-form@7.63.0(react@19.1.1))"
@@ -77,6 +92,7 @@ export class PnpmLockParser {
           isDev,
           isTransitive,
           resolvedVersion: cleanVersion,
+          packageRoot,
         };
 
         // Avoid infinite recursion / duplicates
@@ -137,6 +153,7 @@ export class PnpmLockParser {
                 isDev: isDev, // Inherit isDev? Or consider transitive always false/true? Usually transitive deps don't have isDev flag per se, but we can inherit.
                 isTransitive: true,
                 resolvedVersion: this.extractVersion(childVersion),
+                packageRoot,
               };
               dep.children.push(childDep);
 
@@ -152,17 +169,24 @@ export class PnpmLockParser {
         dependencies.push(dep);
       };
 
-      // Process direct dependencies
-      if (rootImporter.dependencies) {
-        for (const [name, ref] of Object.entries(rootImporter.dependencies)) {
-          processDependency(name, ref.version, false, false);
-        }
-      }
+      for (const [importerName, importer] of availableImporters) {
+        const packageRoot =
+          importerName === '.'
+            ? path.dirname(lockfilePath)
+            : path.join(path.dirname(lockfilePath), importerName);
 
-      // Process dev dependencies
-      if (rootImporter.devDependencies) {
-        for (const [name, ref] of Object.entries(rootImporter.devDependencies)) {
-          processDependency(name, ref.version, true, false);
+        // Process direct dependencies
+        if (importer.dependencies) {
+          for (const [name, ref] of Object.entries(importer.dependencies)) {
+            processDependency(name, ref.version, false, false, packageRoot);
+          }
+        }
+
+        // Process dev dependencies
+        if (importer.devDependencies) {
+          for (const [name, ref] of Object.entries(importer.devDependencies)) {
+            processDependency(name, ref.version, true, false, packageRoot);
+          }
         }
       }
 
@@ -177,6 +201,11 @@ export class PnpmLockParser {
       }
       throw error;
     }
+  }
+
+  private normalizeImporterPath(importerPath: string): string {
+    const normalized = importerPath.split(path.sep).join('/').replace(/^\.\//, '');
+    return normalized === '' ? '.' : normalized;
   }
 
   private extractVersion(versionStr: string): string {

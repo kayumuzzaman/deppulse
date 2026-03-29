@@ -2476,11 +2476,36 @@ function exportReport(format) {
     filename = `deppulse-report-${getTimestamp()}.csv`;
   }
 
+  const exportScope = getExportScope(window.currentDashboardData);
+
   // Send export message to extension
   vscode.postMessage({
     command: 'exportReport',
-    data: { format, filename, content },
+    data: {
+      format,
+      filename,
+      content,
+      workspaceFolder: exportScope.workspaceFolder,
+      packageRoot: exportScope.packageRoot,
+    },
   });
+}
+
+function getExportScope(data) {
+  const dependencies = Array.isArray(data?.dependencies) ? data.dependencies : [];
+  const workspaceFolders = new Set(
+    dependencies
+      .map((dep) => dep.workspaceFolder)
+      .filter((value) => typeof value === 'string' && value)
+  );
+  const packageRoots = new Set(
+    dependencies.map((dep) => dep.packageRoot).filter((value) => typeof value === 'string' && value)
+  );
+
+  return {
+    workspaceFolder: workspaceFolders.size === 1 ? Array.from(workspaceFolders)[0] : undefined,
+    packageRoot: packageRoots.size === 1 ? Array.from(packageRoots)[0] : undefined,
+  };
 }
 
 /**

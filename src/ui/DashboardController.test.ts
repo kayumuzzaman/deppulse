@@ -49,6 +49,7 @@ vi.mock('vscode', () => {
       createWebviewPanel: vi.fn(() => createMockPanel()),
       showErrorMessage: vi.fn(),
       showInformationMessage: vi.fn(),
+      showSaveDialog: vi.fn(),
       showTextDocument: vi.fn(),
       get terminals() {
         return [];
@@ -778,6 +779,7 @@ describe('DashboardController - Message Handlers', () => {
     // Mock vscode APIs
     vi.spyOn(vscode.window, 'showErrorMessage').mockResolvedValue(undefined);
     vi.spyOn(vscode.window, 'showInformationMessage').mockResolvedValue(undefined);
+    vi.spyOn(vscode.window, 'showSaveDialog').mockResolvedValue(undefined);
     vi.spyOn(vscode.window, 'showTextDocument').mockResolvedValue(
       {} as unknown as vscode.TextEditor
     );
@@ -846,6 +848,43 @@ describe('DashboardController - Message Handlers', () => {
         expect.stringContaining('Invalid update data')
       );
     });
+
+    it('should use the dependency workspace package manager in multi-root workspaces', async () => {
+      const terminal = {
+        name: 'DepPulse Updates',
+        show: vi.fn(),
+        sendText: vi.fn(),
+      } as unknown as vscode.Terminal;
+
+      vi.spyOn(vscode.window, 'createTerminal').mockReturnValue(terminal);
+      vi.spyOn(vscode.workspace, 'workspaceFolders', 'get').mockReturnValue([
+        { uri: createMockUri('/workspace-a') },
+        { uri: createMockUri('/workspace-b') },
+      ] as unknown as vscode.WorkspaceFolder[]);
+      vi.spyOn(vscode.workspace.fs, 'stat').mockImplementation(async (uri: vscode.Uri) => {
+        if (uri.fsPath.includes('/workspace-b/pnpm-lock.yaml')) {
+          return {} as vscode.FileStat;
+        }
+        throw new Error('Not found');
+      });
+
+      await controller.handleMessage({
+        command: 'updateDependency',
+        data: {
+          name: 'test-package',
+          version: '2.0.0',
+          packageRoot: '/workspace-b/packages/app',
+          workspaceFolder: '/workspace-b',
+        },
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(terminal.sendText).toHaveBeenCalledWith(
+        'pnpm -C "/workspace-b/packages/app" update test-package@2.0.0',
+        false
+      );
+    });
   });
 
   describe('handleExportReport()', () => {
@@ -855,6 +894,9 @@ describe('DashboardController - Message Handlers', () => {
         mockWorkspaceFolder,
       ] as unknown as vscode.WorkspaceFolder[]);
       vi.spyOn(vscode.Uri, 'joinPath').mockReturnValue(createMockUri('/workspace/report.json'));
+      vi.spyOn(vscode.window, 'showSaveDialog').mockResolvedValue(
+        createMockUri('/workspace/report.json') as unknown as vscode.Uri
+      );
       vi.spyOn(vscode.workspace.fs, 'writeFile').mockResolvedValue();
 
       const exportData = {
@@ -865,6 +907,39 @@ describe('DashboardController - Message Handlers', () => {
       await controller.handleMessage({ command: 'exportReport', data: exportData });
 
       expect(vscode.workspace.fs.writeFile).toHaveBeenCalled();
+    });
+
+    it('should default export to the scoped workspace in multi-root mode', async () => {
+      vi.spyOn(vscode.workspace, 'workspaceFolders', 'get').mockReturnValue([
+        { uri: createMockUri('/workspace-a') },
+        { uri: createMockUri('/workspace-b') },
+      ] as unknown as vscode.WorkspaceFolder[]);
+      vi.spyOn(vscode.Uri, 'joinPath').mockImplementation((base, ...paths) =>
+        createMockUri(`${base.path}/${paths.join('/')}`)
+      );
+      const saveDialogSpy = vi
+        .spyOn(vscode.window, 'showSaveDialog')
+        .mockResolvedValue(
+          createMockUri('/workspace-b/deppulse-report.json') as unknown as vscode.Uri
+        );
+      vi.spyOn(vscode.workspace.fs, 'writeFile').mockResolvedValue();
+
+      await controller.handleMessage({
+        command: 'exportReport',
+        data: {
+          format: 'json',
+          filename: 'deppulse-report.json',
+          content: '{"test":"data"}',
+          workspaceFolder: '/workspace-b',
+          packageRoot: '/workspace-b/packages/app',
+        },
+      });
+
+      expect(saveDialogSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          defaultUri: expect.objectContaining({ fsPath: '/workspace-b/deppulse-report.json' }),
+        })
+      );
     });
 
     it('should handle missing workspace folder', async () => {
@@ -896,6 +971,9 @@ describe('DashboardController - Message Handlers', () => {
         mockWorkspaceFolder,
       ] as unknown as vscode.WorkspaceFolder[]);
       vi.spyOn(vscode.Uri, 'joinPath').mockReturnValue(createMockUri('/workspace/report.json'));
+      vi.spyOn(vscode.window, 'showSaveDialog').mockResolvedValue(
+        createMockUri('/workspace/report.json') as unknown as vscode.Uri
+      );
       vi.spyOn(vscode.workspace.fs, 'writeFile').mockRejectedValue(new Error('Write failed'));
       vi.spyOn(vscode.window, 'showErrorMessage').mockResolvedValue(undefined);
 
@@ -905,6 +983,7 @@ describe('DashboardController - Message Handlers', () => {
         content: '{"test": "data"}',
       };
       await controller.handleMessage({ command: 'exportReport', data: exportData });
+      await new Promise((resolve) => setTimeout(resolve, 0));
       expect(vscode.window.showErrorMessage).toHaveBeenCalled();
     });
   });
@@ -1558,6 +1637,29 @@ describe('DashboardController - Package Manager Detection', () => {
     const packageManager = await (
       controller as unknown as { detectPackageManager: () => Promise<string> }
     ).detectPackageManager();
+    expect(packageManager).toBe('pnpm');
+  });
+
+  it('should detect package manager from the target workspace in multi-root mode', async () => {
+    vi.spyOn(vscode.workspace, 'workspaceFolders', 'get').mockReturnValue([
+      { uri: createMockUri('/workspace-a') },
+      { uri: createMockUri('/workspace-b') },
+    ] as unknown as vscode.WorkspaceFolder[]);
+    vi.spyOn(vscode.Uri, 'joinPath').mockImplementation((base, ...paths) =>
+      createMockUri(`${base.path}/${paths.join('/')}`)
+    );
+
+    vi.spyOn(vscode.workspace.fs, 'stat').mockImplementation(async (uri: vscode.Uri) => {
+      if (uri.fsPath.includes('/workspace-b/pnpm-lock.yaml')) {
+        return {} as vscode.FileStat;
+      }
+      throw new Error('Not found');
+    });
+
+    const packageManager = await (
+      controller as unknown as { detectPackageManager: (targetPath?: string) => Promise<string> }
+    ).detectPackageManager('/workspace-b/packages/app');
+
     expect(packageManager).toBe('pnpm');
   });
 

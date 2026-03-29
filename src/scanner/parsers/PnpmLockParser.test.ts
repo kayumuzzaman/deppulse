@@ -93,4 +93,62 @@ importers: {}
     const deps = await parser.parse('/path/to/pnpm-lock.yaml');
     expect(deps).toEqual([]);
   });
+
+  it('should parse dependencies from all importers in a pnpm workspace', async () => {
+    const mockYaml = `
+lockfileVersion: '9.0'
+importers:
+  .:
+    dependencies:
+      root-only:
+        specifier: ^1.0.0
+        version: 1.0.0
+  packages/app:
+    dependencies:
+      app-only:
+        specifier: ^2.0.0
+        version: 2.1.0
+packages: {}
+snapshots:
+  root-only@1.0.0: {}
+  app-only@2.1.0: {}
+`;
+
+    vi.mocked(fs.readFile).mockResolvedValue(mockYaml);
+
+    const deps = await parser.parse('/repo/pnpm-lock.yaml');
+
+    expect(deps).toHaveLength(2);
+    expect(deps.find((d) => d.name === 'root-only')?.packageRoot).toBe('/repo');
+    expect(deps.find((d) => d.name === 'app-only')?.packageRoot).toBe('/repo/packages/app');
+  });
+
+  it('should parse a specific importer when requested', async () => {
+    const mockYaml = `
+lockfileVersion: '9.0'
+importers:
+  .:
+    dependencies:
+      root-only:
+        specifier: ^1.0.0
+        version: 1.0.0
+  packages/app:
+    dependencies:
+      app-only:
+        specifier: ^2.0.0
+        version: 2.1.0
+packages: {}
+snapshots:
+  root-only@1.0.0: {}
+  app-only@2.1.0: {}
+`;
+
+    vi.mocked(fs.readFile).mockResolvedValue(mockYaml);
+
+    const deps = await parser.parse('/repo/pnpm-lock.yaml', 'packages/app');
+
+    expect(deps).toHaveLength(1);
+    expect(deps[0]?.name).toBe('app-only');
+    expect(deps[0]?.packageRoot).toBe('/repo/packages/app');
+  });
 });

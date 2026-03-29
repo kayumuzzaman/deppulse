@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { getProjectLicense, loadLicenseConfig } from '../config/LicenseConfig';
 import type {
@@ -43,6 +44,14 @@ export class AnalysisEngine implements IAnalysisEngine {
   private chunkSize: number;
   private cacheManager?: CacheManager;
   private currentAnalysisCacheHits: number = 0;
+  private licenseContextCache = new Map<
+    string,
+    Promise<{
+      licenseConfig: ReturnType<typeof loadLicenseConfig>;
+      projectLicense: string | undefined;
+      workspaceFolder?: vscode.WorkspaceFolder;
+    }>
+  >();
   constructor(
     securityAnalyzer: SecurityAnalyzer,
     freshnessAnalyzer: FreshnessAnalyzer,
@@ -87,16 +96,6 @@ export class AnalysisEngine implements IAnalysisEngine {
     );
     const isMonorepo = packageRoots.size > 1;
 
-    // Load license configuration
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    const licenseConfig = loadLicenseConfig(workspaceFolder);
-    const projectLicense = await getProjectLicense(workspaceFolder);
-
-    this.log(
-      'info',
-      `License config loaded: ${licenseConfig.acceptableLicenses.length} acceptable licenses, strictMode=${licenseConfig.strictMode}, projectLicense=${projectLicense || 'none'}`
-    );
-
     // 1. Flatten dependency tree (monorepo: keep per-workspace entries, monolith: dedupe)
     const allDependencies = this.collectAllDependencies(
       projectInfo.dependencies,
@@ -122,6 +121,7 @@ export class AnalysisEngine implements IAnalysisEngine {
       progress: 0,
     };
     this.currentAnalysisCacheHits = 0;
+    this.licenseContextCache.clear();
     this.cacheManager?.resetStats();
 
     // Reset network status for this analysis run
@@ -325,6 +325,9 @@ export class AnalysisEngine implements IAnalysisEngine {
                 'Internal package - always compatible'
               );
             } else {
+              const { licenseConfig, projectLicense } =
+                await this.getLicenseContextForDependency(dependency);
+
               // packageInfo is guaranteed to be defined here due to check above
               // But TypeScript might need convincing or we use non-null assertion if we are sure
               if (!packageInfo) {
@@ -657,6 +660,55 @@ export class AnalysisEngine implements IAnalysisEngine {
     return `${dep.name}@${dep.version}@${scope}`;
   }
 
+  private async getLicenseContextForDependency(dependency: Dependency): Promise<{
+    licenseConfig: ReturnType<typeof loadLicenseConfig>;
+    projectLicense: string | undefined;
+    workspaceFolder?: vscode.WorkspaceFolder;
+  }> {
+    const workspaceFolder = this.resolveWorkspaceFolderForDependency(dependency);
+    const cacheKey = workspaceFolder?.uri.fsPath || '__default__';
+    let cached = this.licenseContextCache.get(cacheKey);
+
+    if (!cached) {
+      cached = (async () => {
+        const licenseConfig = loadLicenseConfig(workspaceFolder);
+        const projectLicense = await getProjectLicense(workspaceFolder);
+        this.log(
+          'info',
+          `License config loaded for ${workspaceFolder?.uri.fsPath || 'default'}: ${licenseConfig.acceptableLicenses.length} acceptable licenses, strictMode=${licenseConfig.strictMode}, projectLicense=${projectLicense || 'none'}`
+        );
+        return { licenseConfig, projectLicense, workspaceFolder };
+      })();
+      this.licenseContextCache.set(cacheKey, cached);
+    }
+
+    return cached;
+  }
+
+  private resolveWorkspaceFolderForDependency(
+    dependency: Dependency
+  ): vscode.WorkspaceFolder | undefined {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+      return undefined;
+    }
+
+    const scopePath = dependency.workspaceFolder || dependency.packageRoot;
+    if (!scopePath) {
+      return workspaceFolders[0];
+    }
+
+    const normalizedScope = path.resolve(scopePath);
+    return [...workspaceFolders]
+      .sort((a, b) => b.uri.fsPath.length - a.uri.fsPath.length)
+      .find((folder) => {
+        const folderPath = path.resolve(folder.uri.fsPath);
+        return (
+          normalizedScope === folderPath || normalizedScope.startsWith(`${folderPath}${path.sep}`)
+        );
+      });
+  }
+
   /**
    * Performs incremental analysis on changed dependencies
    * Loads previous analysis from workspace state, re-analyzes changed dependencies,
@@ -685,16 +737,6 @@ export class AnalysisEngine implements IAnalysisEngine {
     const calcProgress = (processed: number) =>
       Math.min(99, Math.floor((processed / Math.max(totalDeps, 1)) * 95) + 5);
 
-    // Load license configuration
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    const licenseConfig = loadLicenseConfig(workspaceFolder);
-    const projectLicense = await getProjectLicense(workspaceFolder);
-
-    this.log(
-      'info',
-      `License config loaded: ${licenseConfig.acceptableLicenses.length} acceptable licenses, strictMode=${licenseConfig.strictMode}, projectLicense=${projectLicense || 'none'}`
-    );
-
     this.log(
       'info',
       `Starting incremental analysis for ${totalDeps} changed dependencies (transitive ${
@@ -707,6 +749,7 @@ export class AnalysisEngine implements IAnalysisEngine {
       progress: 0,
     };
     this.currentAnalysisCacheHits = 0;
+    this.licenseContextCache.clear();
     this.cacheManager?.resetStats();
 
     const startTime = Date.now();
@@ -831,6 +874,9 @@ export class AnalysisEngine implements IAnalysisEngine {
             if (!packageInfo) {
               throw new Error(`Package info missing for ${dependency.name}`);
             }
+
+            const { licenseConfig, projectLicense } =
+              await this.getLicenseContextForDependency(dependency);
 
             // Parse and analyze license using LicenseAnalyzer
             const parsedLicense = this.licenseAnalyzer.parseLicense(packageInfo.license);

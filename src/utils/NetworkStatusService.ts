@@ -190,23 +190,24 @@ export class NetworkStatusService {
   public static isNetworkError(error: unknown): boolean {
     if (!error) return false;
 
-    const errorMessage = String(error);
+    const errorMessage = String(error).toLowerCase();
     const networkErrorPatterns = [
-      'ENOTFOUND',
-      'ETIMEDOUT',
-      'ECONNREFUSED',
-      'ECONNRESET',
-      'EAI_AGAIN',
-      'getaddrinfo',
-      'network',
-      'offline',
-      'internet',
-      'ENETUNREACH',
-      'EHOSTUNREACH',
+      /\benotfound\b/,
+      /\betimedout\b/,
+      /\beconnrefused\b/,
+      /\beconnreset\b/,
+      /\beai_again\b/,
+      /\benetunreach\b/,
+      /\behostunreach\b/,
+      /getaddrinfo/,
+      /\boffline\b/,
+      /no internet/,
+      /internet connection/,
+      /network error/,
+      /network request failed/,
+      /socket hang up/,
     ];
 
-    return networkErrorPatterns.some((pattern) =>
-      errorMessage.toLowerCase().includes(pattern.toLowerCase())
-    );
+    return networkErrorPatterns.some((pattern) => pattern.test(errorMessage));
   }
 }

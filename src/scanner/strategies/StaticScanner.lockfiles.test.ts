@@ -142,4 +142,47 @@ delta@^1.0.0:
       npmFile?.devDependencies?.some((d) => d.name === 'bravodev' && d.version === '2.3.4')
     ).toBe(true);
   });
+
+  it('uses a workspace-root pnpm lockfile for nested packages', async () => {
+    findFilesMock.mockResolvedValue([{ fsPath: '/repo/packages/app/package.json' }]);
+
+    const pnpmLock = `
+lockfileVersion: '9.0'
+importers:
+  packages/app:
+    dependencies:
+      shared-dep:
+        specifier: ^1.0.0
+        version: 1.2.3
+packages: {}
+snapshots:
+  shared-dep@1.2.3: {}
+`;
+
+    accessMock.mockImplementation(async (target: string | URL | number) => {
+      const p = target.toString();
+      if (p.endsWith(path.join('/repo', 'pnpm-lock.yaml'))) return;
+      const err = new Error('ENOENT');
+      (err as NodeJS.ErrnoException).code = 'ENOENT';
+      throw err;
+    });
+
+    readFileMock.mockImplementation(async (target: string | Buffer | URL | number) => {
+      const p = target.toString();
+      if (p.endsWith('packages/app/package.json')) {
+        return JSON.stringify({ name: 'app-pkg' });
+      }
+      if (p.endsWith('/repo/pnpm-lock.yaml')) {
+        return pnpmLock;
+      }
+      throw new Error(`Unexpected read ${p}`);
+    });
+
+    const result = await scanner.scan('/repo');
+
+    expect(result.dependencyFiles).toHaveLength(1);
+    expect(result.dependencyFiles[0]?.dependencies).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: 'shared-dep', version: '1.2.3' })])
+    );
+  });
 });

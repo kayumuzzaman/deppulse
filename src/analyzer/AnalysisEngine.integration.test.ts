@@ -3,6 +3,7 @@ import type * as vscode from 'vscode';
 import { GitHubAdvisoryClient } from '../api/GitHubAdvisoryClient';
 import { NpmRegistryClient } from '../api/NpmRegistryClient';
 import { OSVClient } from '../api/OSVClient';
+import * as LicenseConfig from '../config/LicenseConfig';
 import type {
   Dependency,
   PackageRegistryClient,
@@ -18,13 +19,19 @@ import { FreshnessAnalyzer } from './FreshnessAnalyzer';
 import { SecurityAnalyzer } from './SecurityAnalyzer';
 import { VulnerabilityAggregator } from './VulnerabilityAggregator';
 
+const workspaceState = {
+  folders: [{ uri: { fsPath: '/test/project' } }],
+};
+
 // Mock vscode
 vi.mock('vscode', () => ({
   window: {
     createOutputChannel: vi.fn(),
   },
   workspace: {
-    workspaceFolders: [{ uri: { fsPath: '/test/project' } }],
+    get workspaceFolders() {
+      return workspaceState.folders;
+    },
     getConfiguration: vi.fn(() => ({
       get: vi.fn((_key: string, defaultValue: unknown) => defaultValue),
       update: vi.fn(),
@@ -86,6 +93,7 @@ describe('AnalysisEngine - End-to-End Integration', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    workspaceState.folders = [{ uri: { fsPath: '/test/project' } }];
     mockOutputChannel = createMockOutputChannel();
     mockContext = createMockContext();
 
@@ -115,6 +123,82 @@ describe('AnalysisEngine - End-to-End Integration', () => {
   });
 
   describe('Full Scan Workflow', () => {
+    it('loads license settings from the dependency workspace in multi-root mode', async () => {
+      workspaceState.folders = [{ uri: { fsPath: '/repo-a' } }, { uri: { fsPath: '/repo-b' } }];
+
+      const loadLicenseConfigSpy = vi
+        .spyOn(LicenseConfig, 'loadLicenseConfig')
+        .mockImplementation((workspaceFolder?: vscode.WorkspaceFolder) => ({
+          acceptableLicenses: [workspaceFolder?.uri.fsPath || 'default'],
+          strictMode: false,
+          projectLicense: undefined,
+        }));
+      vi.spyOn(LicenseConfig, 'getProjectLicense').mockResolvedValue('MIT');
+      vi.spyOn(securityAnalyzer, 'analyzeBatch').mockResolvedValue(new Map());
+      vi.spyOn(freshnessAnalyzer, 'analyze').mockResolvedValue({
+        currentVersion: '1.0.0',
+        latestVersion: '1.0.0',
+        versionGap: 'current',
+        releaseDate: new Date(),
+        isOutdated: false,
+        isUnmaintained: false,
+      });
+      vi.spyOn(compatibilityAnalyzer, 'analyze').mockResolvedValue({
+        status: 'unknown',
+        issues: [],
+      });
+      vi.spyOn(registryClient, 'getPackageInfo').mockResolvedValue({
+        name: 'pkg-b',
+        version: '1.0.0',
+        description: 'test',
+        homepage: '',
+        repository: '',
+        license: 'MIT',
+        publishedAt: new Date(),
+      } as Awaited<ReturnType<PackageRegistryClient['getPackageInfo']>>);
+
+      const projectInfo: ProjectInfo = {
+        type: ['npm'],
+        dependencyFiles: [
+          {
+            path: '/repo-b/package.json',
+            type: 'npm',
+            packageRoot: '/repo-b',
+            workspaceFolder: '/repo-b',
+            dependencies: [
+              {
+                name: 'pkg-b',
+                version: '1.0.0',
+                versionConstraint: '^1.0.0',
+                isDev: false,
+                packageRoot: '/repo-b',
+                workspaceFolder: '/repo-b',
+              },
+            ],
+          },
+        ],
+        dependencies: [
+          {
+            name: 'pkg-b',
+            version: '1.0.0',
+            versionConstraint: '^1.0.0',
+            isDev: false,
+            packageRoot: '/repo-b',
+            workspaceFolder: '/repo-b',
+          },
+        ],
+      };
+
+      await analysisEngine.analyze(projectInfo, { includeTransitiveDependencies: false });
+
+      expect(loadLicenseConfigSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ uri: expect.objectContaining({ fsPath: '/repo-b' }) })
+      );
+      expect(loadLicenseConfigSpy).not.toHaveBeenCalledWith(
+        expect.objectContaining({ uri: expect.objectContaining({ fsPath: '/repo-a' }) })
+      );
+    }, 10000);
+
     it('should complete full analysis workflow for small project', async () => {
       const dependencies: Dependency[] = [
         { name: 'lodash', version: '4.17.20', versionConstraint: '4.17.20', isDev: false },

@@ -193,7 +193,8 @@ export class StaticScanner implements ScannerStrategy {
           const lockfile = await this.resolveLockfile(dirPath);
           if (lockfile?.type === 'pnpm') {
             try {
-              const lockDeps = await this.pnpmLockParser.parse(lockfile.path);
+              const importerPath = path.relative(path.dirname(lockfile.path), dirPath) || '.';
+              const lockDeps = await this.pnpmLockParser.parse(lockfile.path, importerPath);
               depFile = {
                 path: fileUri.fsPath,
                 type: 'npm',
@@ -390,29 +391,39 @@ export class StaticScanner implements ScannerStrategy {
   private async resolveLockfile(
     packageDir: string
   ): Promise<{ type: 'pnpm' | 'yarn' | 'npm'; path: string } | null> {
-    const pnpmLock = path.join(packageDir, 'pnpm-lock.yaml');
-    const yarnLock = path.join(packageDir, 'yarn.lock');
-    const npmLock = path.join(packageDir, 'package-lock.json');
+    let currentDir = packageDir;
 
-    try {
-      await fs.access(pnpmLock);
-      return { type: 'pnpm', path: pnpmLock };
-    } catch {
-      // ignore
-    }
+    while (true) {
+      const pnpmLock = path.join(currentDir, 'pnpm-lock.yaml');
+      const yarnLock = path.join(currentDir, 'yarn.lock');
+      const npmLock = path.join(currentDir, 'package-lock.json');
 
-    try {
-      await fs.access(yarnLock);
-      return { type: 'yarn', path: yarnLock };
-    } catch {
-      // ignore
-    }
+      try {
+        await fs.access(pnpmLock);
+        return { type: 'pnpm', path: pnpmLock };
+      } catch {
+        // ignore
+      }
 
-    try {
-      await fs.access(npmLock);
-      return { type: 'npm', path: npmLock };
-    } catch {
-      // ignore
+      try {
+        await fs.access(yarnLock);
+        return { type: 'yarn', path: yarnLock };
+      } catch {
+        // ignore
+      }
+
+      try {
+        await fs.access(npmLock);
+        return { type: 'npm', path: npmLock };
+      } catch {
+        // ignore
+      }
+
+      const parentDir = path.dirname(currentDir);
+      if (parentDir === currentDir) {
+        break;
+      }
+      currentDir = parentDir;
     }
 
     return null;

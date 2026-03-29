@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type * as vscode from 'vscode';
+import * as vscode from 'vscode';
 import type { ProjectInfo } from '../types';
 import { NodeJsScanner } from './NodeJsScanner';
 
@@ -21,6 +21,13 @@ const workspaceState: {
 } = {
   folders: [],
   strategy: 'auto',
+};
+
+const watcherMock = {
+  onDidCreate: vi.fn(),
+  onDidChange: vi.fn(),
+  onDidDelete: vi.fn(),
+  dispose: vi.fn(),
 };
 
 vi.mock('vscode', () => {
@@ -66,6 +73,7 @@ vi.mock('vscode', () => {
       get workspaceFolders() {
         return workspaceState.folders;
       },
+      createFileSystemWatcher: vi.fn(() => watcherMock),
       fs: {
         stat: vi.fn(),
         readFile: vi.fn(),
@@ -212,5 +220,41 @@ describe('NodeJsScanner monorepo support', () => {
 
     expect(nativeScan).toHaveBeenCalledTimes(1);
     expect(staticScan).toHaveBeenCalledTimes(1);
+  });
+
+  it('watches lockfiles as well as package.json', () => {
+    const scanner = new NodeJsScanner(outputChannel as unknown as vscode.OutputChannel);
+
+    scanner.watchForChanges(() => {});
+
+    expect(vscode.workspace.createFileSystemWatcher).toHaveBeenCalledWith(
+      '**/{package.json,package-lock.json,pnpm-lock.yaml,yarn.lock}'
+    );
+  });
+
+  it('does not label generic native-scan failures as network issues', async () => {
+    workspaceState.folders = [{ uri: { fsPath: '/repo' } }];
+
+    const scanner = new NodeJsScanner(outputChannel as unknown as vscode.OutputChannel);
+    type ScannerTestHarness = {
+      staticScanner: { scan: (dir: string) => Promise<ProjectInfo> };
+      nativeScanner: { scan: (dir: string) => Promise<ProjectInfo> };
+    };
+    const scannerAny = scanner as unknown as ScannerTestHarness;
+
+    vi.spyOn(scannerAny.staticScanner, 'scan').mockResolvedValue({
+      type: ['npm'],
+      dependencyFiles: [],
+      dependencies: [],
+    });
+    vi.spyOn(scannerAny.nativeScanner, 'scan').mockRejectedValue(
+      new Error('Native scan reported network mode mismatch')
+    );
+
+    await scanner.scanWorkspace();
+
+    expect(vscode.window.showWarningMessage).toHaveBeenCalledWith(
+      'DepPulse could not run the native dependency scan (missing lockfile, CLI, or installed node_modules). Using static scan instead (direct dependencies only). Check the DepPulse output for details.'
+    );
   });
 });

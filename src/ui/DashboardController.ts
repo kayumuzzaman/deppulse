@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import * as vscode from 'vscode';
 import {
   getCurrentAnalysisStatus,
@@ -635,7 +636,9 @@ export class DashboardController implements IDashboardController {
       return;
     }
 
-    const packageManager = await this.detectPackageManager();
+    const packageManager = await this.detectPackageManager(
+      updateData.packageRoot || updateData.workspaceFolder
+    );
     this.log(`Detected package manager: ${packageManager}`);
     const cwd = updateData.packageRoot || updateData.workspaceFolder;
     const command = this.generateUpdateCommand(
@@ -655,7 +658,13 @@ export class DashboardController implements IDashboardController {
   private async handleExportReport(data: unknown): Promise<void> {
     this.log('Export report requested');
 
-    const exportData = data as { format: string; filename: string; content: string };
+    const exportData = data as {
+      format: string;
+      filename: string;
+      content: string;
+      workspaceFolder?: string;
+      packageRoot?: string;
+    };
     if (!exportData.filename || !exportData.content) {
       this.log('Invalid export data');
       return;
@@ -668,8 +677,18 @@ export class DashboardController implements IDashboardController {
         return;
       }
 
-      const rootPath = workspaceFolders[0].uri;
-      const filePath = vscode.Uri.joinPath(rootPath, exportData.filename);
+      const workspaceFolder = this.resolveWorkspaceFolder(
+        exportData.packageRoot || exportData.workspaceFolder,
+        workspaceFolders
+      );
+      const defaultRoot = workspaceFolder?.uri ?? workspaceFolders[0].uri;
+      const defaultPath = vscode.Uri.joinPath(defaultRoot, exportData.filename);
+      const filePath =
+        (await vscode.window.showSaveDialog({
+          defaultUri: defaultPath,
+          saveLabel: 'Export DepPulse Report',
+          filters: exportData.format === 'csv' ? { CSV: ['csv'] } : { JSON: ['json'] },
+        })) ?? defaultPath;
 
       // Write file
       await vscode.workspace.fs.writeFile(filePath, Buffer.from(exportData.content, 'utf8'));
@@ -955,19 +974,43 @@ export class DashboardController implements IDashboardController {
    * Detect package manager from lock files
    * @returns Detected package manager
    */
-  private async detectPackageManager(): Promise<'npm' | 'pnpm' | 'yarn'> {
+  private async detectPackageManager(targetPath?: string): Promise<'npm' | 'pnpm' | 'yarn'> {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
       this.log('No workspace folder found, defaulting to npm');
       return 'npm';
     }
 
-    const rootPath = workspaceFolders[0].uri;
-    this.log(`Detecting package manager in: ${rootPath.fsPath}`);
+    const workspaceFolder = this.resolveWorkspaceFolder(targetPath, workspaceFolders);
+    const rootPath = workspaceFolder?.uri.fsPath ?? workspaceFolders[0].uri.fsPath;
+    const scanRoots = this.buildPackageManagerSearchRoots(targetPath, rootPath);
+
+    this.log(
+      `Detecting package manager for target: ${targetPath || rootPath} using roots: ${scanRoots.join(', ')}`
+    );
+
+    for (const scanRoot of scanRoots) {
+      const packageManager = await this.detectPackageManagerInRoot(scanRoot);
+      if (packageManager) {
+        return packageManager;
+      }
+    }
+
+    this.log('No lock file found, defaulting to npm');
+    return 'npm';
+  }
+
+  private async detectPackageManagerInRoot(
+    rootPath: string
+  ): Promise<'npm' | 'pnpm' | 'yarn' | undefined> {
+    const rootUri = {
+      fsPath: rootPath,
+      path: rootPath,
+    } as vscode.Uri;
 
     // Check for pnpm-lock.yaml
     try {
-      const pnpmLockPath = vscode.Uri.joinPath(rootPath, 'pnpm-lock.yaml');
+      const pnpmLockPath = vscode.Uri.joinPath(rootUri, 'pnpm-lock.yaml');
       await vscode.workspace.fs.stat(pnpmLockPath);
       this.log(`Found pnpm-lock.yaml at ${pnpmLockPath.fsPath}`);
       return 'pnpm';
@@ -977,7 +1020,7 @@ export class DashboardController implements IDashboardController {
 
     // Check for yarn.lock
     try {
-      const yarnLockPath = vscode.Uri.joinPath(rootPath, 'yarn.lock');
+      const yarnLockPath = vscode.Uri.joinPath(rootUri, 'yarn.lock');
       await vscode.workspace.fs.stat(yarnLockPath);
       this.log(`Found yarn.lock at ${yarnLockPath.fsPath}`);
       return 'yarn';
@@ -987,17 +1030,14 @@ export class DashboardController implements IDashboardController {
 
     // Check for package-lock.json
     try {
-      const npmLockPath = vscode.Uri.joinPath(rootPath, 'package-lock.json');
+      const npmLockPath = vscode.Uri.joinPath(rootUri, 'package-lock.json');
       await vscode.workspace.fs.stat(npmLockPath);
       this.log(`Found package-lock.json at ${npmLockPath.fsPath}`);
       return 'npm';
     } catch {
       this.log('package-lock.json not found');
     }
-
-    // Default to npm
-    this.log('No lock file found, defaulting to npm');
-    return 'npm';
+    return undefined;
   }
 
   /**
@@ -1020,13 +1060,14 @@ export class DashboardController implements IDashboardController {
       return;
     }
 
-    const packageManager = await this.detectPackageManager();
-    const commands = bulkData.packages.map((pkg) =>
-      this.generateUpdateCommand(
-        packageManager,
-        pkg.name,
-        pkg.version,
-        pkg.packageRoot || pkg.workspaceFolder
+    const commands = await Promise.all(
+      bulkData.packages.map(async (pkg) =>
+        this.generateUpdateCommand(
+          await this.detectPackageManager(pkg.packageRoot || pkg.workspaceFolder),
+          pkg.name,
+          pkg.version,
+          pkg.packageRoot || pkg.workspaceFolder
+        )
       )
     );
 
@@ -1128,5 +1169,56 @@ export class DashboardController implements IDashboardController {
   private log(message: string): void {
     const timestamp = new Date().toISOString();
     this._outputChannel.appendLine(`[${timestamp}] [DashboardController] ${message}`);
+  }
+
+  private resolveWorkspaceFolder(
+    targetPath: string | undefined,
+    workspaceFolders: readonly vscode.WorkspaceFolder[]
+  ): vscode.WorkspaceFolder | undefined {
+    if (!targetPath) {
+      return workspaceFolders[0];
+    }
+
+    const normalizedTarget = path.resolve(targetPath);
+    return [...workspaceFolders]
+      .sort((a, b) => b.uri.fsPath.length - a.uri.fsPath.length)
+      .find((folder) => {
+        const folderPath = path.resolve(folder.uri.fsPath);
+        return (
+          normalizedTarget === folderPath || normalizedTarget.startsWith(`${folderPath}${path.sep}`)
+        );
+      });
+  }
+
+  private buildPackageManagerSearchRoots(
+    targetPath: string | undefined,
+    workspaceRoot: string
+  ): string[] {
+    const normalizedWorkspaceRoot = path.resolve(workspaceRoot);
+    const roots: string[] = [];
+
+    if (targetPath) {
+      let current = path.resolve(targetPath);
+      while (
+        current === normalizedWorkspaceRoot ||
+        current.startsWith(`${normalizedWorkspaceRoot}${path.sep}`)
+      ) {
+        roots.push(current);
+        if (current === normalizedWorkspaceRoot) {
+          break;
+        }
+        const parent = path.dirname(current);
+        if (parent === current) {
+          break;
+        }
+        current = parent;
+      }
+    }
+
+    if (!roots.includes(normalizedWorkspaceRoot)) {
+      roots.push(normalizedWorkspaceRoot);
+    }
+
+    return roots;
   }
 }
