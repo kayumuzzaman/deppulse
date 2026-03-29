@@ -701,7 +701,7 @@ export class DashboardController implements IDashboardController {
 
       // Show success notification with action to open file
       const action = await vscode.window.showInformationMessage(
-        `Report exported to ${exportData.filename}`,
+        `Report exported to ${filePath.fsPath}`,
         'Open File'
       );
 
