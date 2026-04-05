@@ -554,7 +554,7 @@ if (typeof window.TableManager === 'undefined') {
       const headers = [
         {
           key: 'packageName',
-          html: `<th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-300 cursor-pointer hover:text-gray-900 dark:hover:text-gray-100 transition-colors" data-sort="packageName"><div class="flex items-center gap-3"><input type="checkbox" id="select-all" class="smart-checkbox-input shrink-0 self-center -ml-2" aria-label="Select all dependencies" onclick="event.stopPropagation()"><span class="flex items-center gap-1">Package <span class="sort-indicator" aria-hidden="true">${neutralIcon}</span></span></div></th>`,
+          html: `<th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-300 cursor-pointer hover:text-gray-900 dark:hover:text-gray-100 transition-colors" data-sort="packageName"><div class="flex items-center gap-3"><input type="checkbox" id="select-all" class="smart-checkbox-input shrink-0 self-center -ml-2" aria-label="Select all dependencies" data-action="toggle-select-all"><span class="flex items-center gap-1">Package <span class="sort-indicator" aria-hidden="true">${neutralIcon}</span></span></div></th>`,
           alwaysVisible: true,
         },
         {
@@ -636,15 +636,13 @@ if (typeof window.TableManager === 'undefined') {
                    data-package="${safePackageNameAttr}"
                    data-row-key="${safeRowKey}"
                    aria-label="Select ${safePackageNameAttr}"
-                   ${isSelected ? 'checked' : ''}
-                   onclick="event.stopPropagation(); const checkbox = event.currentTarget; const key = checkbox.dataset.rowKey; if (window.__depPulseTableManager) { window.__depPulseTableManager.toggleRowSelection(key); }">
+                   ${isSelected ? 'checked' : ''}>
             <button class="expand-toggle-modern ${isExpanded ? 'expanded' : ''} shrink-0" 
                     data-package="${safePackageNameAttr}"
                     data-row-key="${safeRowKey}"
                     aria-label="Toggle details for ${safePackageNameAttr}" 
                     aria-expanded="${isExpanded}"
-                    title="Click to ${isExpanded ? 'collapse' : 'expand'} details"
-                    onclick="event.stopPropagation(); const btn = event.currentTarget; const key = btn.dataset.rowKey; if (window.__depPulseTableManager) { window.__depPulseTableManager.toggleRowExpansion(key); }">
+                    title="Click to ${isExpanded ? 'collapse' : 'expand'} details">
               <svg class="expand-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor">
                 <path d="M6 8l4 4 4-4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
@@ -671,11 +669,20 @@ if (typeof window.TableManager === 'undefined') {
                             : 'Transitive vulnerabilities detected';
                         return `
                         <span class="relative inline-flex items-center" aria-label="${tooltip}">
-                          <svg class="transitive-icon h-4 w-4 text-blue-600 dark:text-blue-300" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true">
-                            <circle cx="10" cy="10" r="8" stroke-width="1.5"></circle>
-                            <line x1="10" y1="6" x2="10" y2="11" stroke-width="1.5" stroke-linecap="round"></line>
-                            <circle cx="10" cy="14" r="1" fill="currentColor"></circle>
-                          </svg>
+                          <button class="transitive-indicator-btn inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-blue-700 dark:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                                  type="button"
+                                  data-action="view-transitive"
+                                  data-package="${safePackageNameAttr}"
+                                  data-row-key="${safeRowKey}"
+                                  aria-label="${tooltip}"
+                                  title="${tooltip}">
+                            <svg class="transitive-icon h-4 w-4 text-blue-600 dark:text-blue-300" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true">
+                              <circle cx="10" cy="10" r="8" stroke-width="1.5"></circle>
+                              <line x1="10" y1="6" x2="10" y2="11" stroke-width="1.5" stroke-linecap="round"></line>
+                              <circle cx="10" cy="14" r="1" fill="currentColor"></circle>
+                            </svg>
+                            <span class="text-[10px] font-semibold">${count}</span>
+                          </button>
                           <span class="tooltip-bubble pointer-events-none absolute left-1/2 -translate-x-1/2 -top-12 flex flex-col items-center transition-all duration-150 ease-out opacity-0" aria-hidden="true">
                             <span class="px-3 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold shadow-lg shadow-slate-900/40 border border-white/10 whitespace-nowrap">
                               ${tooltip}
@@ -895,22 +902,22 @@ if (typeof window.TableManager === 'undefined') {
             <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
               <!-- Tab Headers -->
               <div class="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 overflow-x-auto">
-                <button class="expanded-tab active px-4 py-3 text-sm font-medium text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 whitespace-nowrap" data-tab="overview" onclick="switchExpandedTab(event, '${safeRowKey}', 'overview', '${safePackageNameAttr}')">
+                <button class="expanded-tab active px-4 py-3 text-sm font-medium text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 whitespace-nowrap" data-tab="overview" data-row-key="${safeRowKey}" data-package="${safePackageNameAttr}">
                   Overview
                 </button>
-                <button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="vulnerabilities" onclick="switchExpandedTab(event, '${safeRowKey}', 'vulnerabilities', '${safePackageNameAttr}')">
+                <button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="vulnerabilities" data-row-key="${safeRowKey}" data-package="${safePackageNameAttr}">
                   Vulnerabilities ${dep.cveIds.length > 0 ? `(${dep.cveIds.length})` : ''}
                 </button>
                 ${
                   dep.compatibility && dep.compatibility.issues.length > 0
-                    ? `<button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="compatibility" onclick="switchExpandedTab(event, '${safeRowKey}', 'compatibility', '${safePackageNameAttr}')">
+                    ? `<button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="compatibility" data-row-key="${safeRowKey}" data-package="${safePackageNameAttr}">
                         Compatibility ${dep.compatibility.issues.length > 0 ? `(${dep.compatibility.issues.length})` : ''}
                       </button>`
                     : ''
                 }
                 ${
                   dep.license
-                    ? `<button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="license" onclick="switchExpandedTab(event, '${safeRowKey}', 'license', '${safePackageNameAttr}')">
+                    ? `<button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="license" data-row-key="${safeRowKey}" data-package="${safePackageNameAttr}">
                         <span class="inline-flex items-center gap-1.5">
                           License
                           ${
@@ -926,17 +933,17 @@ if (typeof window.TableManager === 'undefined') {
                 }
                 ${
                   showTransitiveTab
-                    ? `<button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="transitive" onclick="switchExpandedTab(event, '${safeRowKey}', 'transitive', '${safePackageNameAttr}')">
+                    ? `<button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="transitive" data-row-key="${safeRowKey}" data-package="${safePackageNameAttr}">
                     Transitive Dependencies
                   </button>`
                     : ''
                 }
-                <button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="actions" onclick="switchExpandedTab(event, '${safeRowKey}', 'actions', '${safePackageNameAttr}')">
+                <button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="actions" data-row-key="${safeRowKey}" data-package="${safePackageNameAttr}">
                   Actions
                 </button>
                 ${
                   showAlternativesTab
-                    ? `<button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="alternatives" onclick="switchExpandedTab(event, '${safeRowKey}', 'alternatives', '${safePackageNameAttr}')">
+                    ? `<button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="alternatives" data-row-key="${safeRowKey}" data-package="${safePackageNameAttr}">
                     Alternatives
                   </button>`
                     : ''
@@ -1271,7 +1278,7 @@ if (typeof window.TableManager === 'undefined') {
           <button
             class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-[10px] text-gray-700 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors group relative"
             type="button"
-            onclick="resetLlmConfig()"
+            data-action="reset-llm-config"
             title="Reset all LLM API keys and models"
           >
             <span class="group-hover:hidden">↺</span>
@@ -2644,6 +2651,22 @@ if (typeof window.TableManager === 'undefined') {
         requestAnimationFrame(() => focusVulnTab());
       } else {
         focusVulnTab();
+      }
+    }
+
+    showTransitiveDependencies(rowKey, packageName) {
+      const focusTransitiveTab = () => {
+        if (typeof window.switchExpandedTab === 'function') {
+          window.switchExpandedTab(null, rowKey, 'transitive', packageName || rowKey);
+        }
+      };
+
+      if (this.expandedRow !== rowKey) {
+        this.expandedRow = rowKey;
+        this.render();
+        requestAnimationFrame(() => focusTransitiveTab());
+      } else {
+        focusTransitiveTab();
       }
     }
 

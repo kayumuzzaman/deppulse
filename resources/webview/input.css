@@ -1502,6 +1502,7 @@ select:focus {
   display: flex;
   align-items: center;
   align-self: center;
+  z-index: 70;
 }
 
 /* Info Icon Button */
@@ -1596,6 +1597,10 @@ select:focus {
   visibility: hidden;
   pointer-events: none;
   transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tooltip-bubble {
+  z-index: 80;
 }
 
 .dark .info-tooltip-panel {
