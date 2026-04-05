@@ -613,8 +613,10 @@ if (typeof window.TableManager === 'undefined') {
       const safePackageNameAttr = escapeAttribute(dep.packageName);
       const safeRowKey = escapeAttribute(rowKey);
       const safeSeverity = escapeHtml(dep.severity);
+      const safeSeverityAttr = escapeAttribute(dep.severity);
       const safeCurrentVersion = escapeHtml(dep.currentVersion);
       const safeLatestVersion = escapeHtml(dep.latestVersion);
+      const safeScopeTitle = escapeAttribute(dep.packageRoot || dep.workspaceFolder || '');
       const severityClass = this.getSeverityBorderClass(dep.severity);
       const paddingClasses = this.getDensityClasses();
       const densityClasses = `${paddingClasses} align-middle`;
@@ -628,7 +630,7 @@ if (typeof window.TableManager === 'undefined') {
           data-row-key="${safeRowKey}"
           tabindex="0" 
           role="row" 
-          aria-label="Dependency: ${safePackageNameAttr}, Severity: ${safeSeverity}, ${dep.cveIds.length} vulnerabilities">
+          aria-label="Dependency: ${safePackageNameAttr}, Severity: ${safeSeverityAttr}, ${dep.cveIds.length} vulnerabilities">
         <td class="${densityClasses}">
           <div class="flex items-center gap-3">
             <input type="checkbox" 
@@ -648,12 +650,12 @@ if (typeof window.TableManager === 'undefined') {
               </svg>
             </button>
             <div class="flex items-center gap-2.5 min-w-0 flex-1">
-              <span class="inline-flex h-3 w-3 rounded-full ${severityDot} shrink-0 ring-2 ring-white dark:ring-gray-800 ${dep.severity === 'critical' ? 'dot-pulse-critical' : ''}" aria-hidden="true" title="Severity: ${safeSeverity}"></span>
+              <span class="inline-flex h-3 w-3 rounded-full ${severityDot} shrink-0 ring-2 ring-white dark:ring-gray-800 ${dep.severity === 'critical' ? 'dot-pulse-critical' : ''}" aria-hidden="true" title="Severity: ${safeSeverityAttr}"></span>
               <span class="font-semibold text-gray-900 dark:text-gray-100 truncate">${safePackageName}</span>
               <span class="sr-only">Severity ${safeSeverity}</span>
               ${
                 shouldShowScope
-                  ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-200/80 dark:border-gray-700/80 truncate max-w-[160px]" title="${dep.packageRoot || dep.workspaceFolder}">
+                  ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-200/80 dark:border-gray-700/80 truncate max-w-[160px]" title="${safeScopeTitle}">
                     ${this.formatWorkspaceLabel(dep)}
                   </span>`
                   : ''
