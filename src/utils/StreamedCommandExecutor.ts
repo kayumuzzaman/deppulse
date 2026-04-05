@@ -13,6 +13,22 @@ export interface StreamedCommandResult {
   stderr: string;
 }
 
+function resolveExecutable(command: string): string {
+  if (process.platform !== 'win32') {
+    return command;
+  }
+
+  switch (command.toLowerCase()) {
+    case 'npm':
+    case 'npx':
+    case 'pnpm':
+    case 'yarn':
+      return `${command}.cmd`;
+    default:
+      return command;
+  }
+}
+
 /**
  * Executes commands with streamed stdout to avoid buffer limits.
  */
@@ -38,6 +54,10 @@ export class StreamedCommandExecutor {
     cwd: string,
     timeout: number = 20000
   ): Promise<StreamedCommandResult> {
+    const resolvedCommand = {
+      ...command,
+      command: resolveExecutable(command.command),
+    };
     const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'dep-pulse-'));
     const filePath = path.join(tempDir, 'stdout.json');
     const stdoutStream = fs.createWriteStream(filePath);
@@ -46,7 +66,7 @@ export class StreamedCommandExecutor {
     this.logger.debug(`Streaming command: ${commandLabel} in ${cwd} to ${filePath}`);
 
     return new Promise<StreamedCommandResult>((resolve, reject) => {
-      const child = spawn(command.command, command.args ?? [], {
+      const child = spawn(resolvedCommand.command, resolvedCommand.args ?? [], {
         cwd,
       });
 
@@ -76,6 +96,11 @@ export class StreamedCommandExecutor {
       };
 
       child.on('error', (err) => {
+        const code = err && typeof err === 'object' && 'code' in err ? err.code : undefined;
+        if (code === 'ENOENT') {
+          fail(`Command not found: ${commandLabel}`, { code });
+          return;
+        }
         fail(`Command error: ${commandLabel}. ${err instanceof Error ? err.message : String(err)}`);
       });
 
