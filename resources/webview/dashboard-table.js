@@ -119,6 +119,7 @@ if (typeof window.CardManager === 'undefined') {
         this.isSinglePackageProject || !dep.workspaceFolder ? '' : dep.workspaceFolder;
       const packageRoot = this.isSinglePackageProject || !dep.packageRoot ? '' : dep.packageRoot;
       const safePackageNameAttr = escapeAttribute(dep.packageName);
+      const safePackageName = escapeHtml(dep.packageName);
       const safeSeverity = escapeHtml(dep.severity);
       const safeCurrentVersion = escapeHtml(dep.currentVersion);
       const safeLatestVersion = escapeHtml(dep.latestVersion);
