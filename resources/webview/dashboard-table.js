@@ -118,6 +118,15 @@ if (typeof window.CardManager === 'undefined') {
       const workspaceFolder =
         this.isSinglePackageProject || !dep.workspaceFolder ? '' : dep.workspaceFolder;
       const packageRoot = this.isSinglePackageProject || !dep.packageRoot ? '' : dep.packageRoot;
+      const safePackageNameAttr = escapeAttribute(dep.packageName);
+      const safePackageName = escapeHtml(dep.packageName);
+      const safeSeverity = escapeHtml(dep.severity);
+      const safeCurrentVersion = escapeHtml(dep.currentVersion);
+      const safeLatestVersion = escapeHtml(dep.latestVersion);
+      const safeLatestVersionAttr = escapeAttribute(dep.latestVersion);
+      const safeRowKey = escapeAttribute(rowKey);
+      const safeWorkspaceFolder = escapeAttribute(workspaceFolder);
+      const safePackageRoot = escapeAttribute(packageRoot);
       const severityGradients = {
         critical: 'from-red-500 to-red-600',
         high: 'from-orange-500 to-orange-600',
@@ -140,26 +149,26 @@ if (typeof window.CardManager === 'undefined') {
 
       return `
       <div class="flip-card-container" style="perspective: 1000px;">
-        <div class="flip-card ${isFlipped ? 'flipped' : ''}" style="position: relative; transform-style: preserve-3d; transition: transform 0.6s;" data-package="${dep.packageName}">
+        <div class="flip-card ${isFlipped ? 'flipped' : ''}" style="position: relative; transform-style: preserve-3d; transition: transform 0.6s;" data-package="${safePackageNameAttr}">
           <!-- Front of Card -->
       <div class="group bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-xl border border-gray-200 dark:border-gray-700 transition-all duration-300 hover:-translate-y-1 overflow-hidden animate-fade-in">
         <!-- Card Header with Gradient -->
         <div class="bg-linear-to-r ${gradient} p-4 text-white">
           <div class="flex items-center justify-between mb-2">
-            <h3 class="font-mono font-semibold text-lg truncate pr-2" title="${dep.packageName}">
-              ${dep.packageName}
+            <h3 class="font-mono font-semibold text-lg truncate pr-2" title="${safePackageNameAttr}">
+              ${safePackageName}
             </h3>
             <span class="text-xs font-medium px-2 py-1 bg-white bg-opacity-30 rounded-full shrink-0">
-              ${dep.severity.toUpperCase()}
+              ${safeSeverity.toUpperCase()}
             </span>
           </div>
           <div class="flex items-center gap-2 text-sm opacity-90">
-            <span class="font-mono">${dep.currentVersion}</span>
+            <span class="font-mono">${safeCurrentVersion}</span>
             ${
               dep.hasUpdate
                 ? `
               <span>→</span>
-              <span class="font-mono font-semibold">${dep.latestVersion}</span>
+              <span class="font-mono font-semibold">${safeLatestVersion}</span>
             `
                 : ''
             }
@@ -230,12 +239,12 @@ if (typeof window.CardManager === 'undefined') {
             dep.hasUpdate
               ? `
             <button class="update-btn flex-1 px-3 py-2 bg-gradient-blue text-white rounded-lg text-sm font-medium transition-all hover:shadow-lg flex items-center justify-center gap-1" 
-                    data-package="${dep.packageName}" 
-                    data-version="${dep.latestVersion}"
-                    data-row-key="${rowKey}"
-                    data-workspace="${workspaceFolder}"
-                    data-package-root="${packageRoot}"
-                    title="Update to ${dep.latestVersion}">
+                    data-package="${safePackageNameAttr}" 
+                    data-version="${safeLatestVersionAttr}"
+                    data-row-key="${safeRowKey}"
+                    data-workspace="${safeWorkspaceFolder}"
+                    data-package-root="${safePackageRoot}"
+                    title="Update to ${safeLatestVersionAttr}">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
                 <path d="M7 17L17 7"/>
                 <path d="M7 7h10v10"/>
@@ -253,7 +262,7 @@ if (typeof window.CardManager === 'undefined') {
             dep.cveIds.length > 0
               ? `
             <button class="view-details-btn px-3 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" 
-                    data-package="${dep.packageName}"
+                    data-package="${safePackageNameAttr}"
                     title="View vulnerability details">
               <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
@@ -545,7 +554,7 @@ if (typeof window.TableManager === 'undefined') {
       const headers = [
         {
           key: 'packageName',
-          html: `<th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-300 cursor-pointer hover:text-gray-900 dark:hover:text-gray-100 transition-colors" data-sort="packageName"><div class="flex items-center gap-3"><input type="checkbox" id="select-all" class="smart-checkbox-input shrink-0 self-center -ml-2" aria-label="Select all dependencies" onclick="event.stopPropagation()"><span class="flex items-center gap-1">Package <span class="sort-indicator" aria-hidden="true">${neutralIcon}</span></span></div></th>`,
+          html: `<th scope="col" class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-300 cursor-pointer hover:text-gray-900 dark:hover:text-gray-100 transition-colors" data-sort="packageName"><div class="flex items-center gap-3"><input type="checkbox" id="select-all" class="smart-checkbox-input shrink-0 self-center -ml-2" aria-label="Select all dependencies" data-action="toggle-select-all"><span class="flex items-center gap-1">Package <span class="sort-indicator" aria-hidden="true">${neutralIcon}</span></span></div></th>`,
           alwaysVisible: true,
         },
         {
@@ -600,6 +609,14 @@ if (typeof window.TableManager === 'undefined') {
       const rowKey = dep.rowKey || dep.packageName;
       const isSelected = this.selectedRows.has(rowKey);
       const isExpanded = this.expandedRow === rowKey;
+      const safePackageName = escapeHtml(dep.packageName);
+      const safePackageNameAttr = escapeAttribute(dep.packageName);
+      const safeRowKey = escapeAttribute(rowKey);
+      const safeSeverity = escapeHtml(dep.severity);
+      const safeSeverityAttr = escapeAttribute(dep.severity);
+      const safeCurrentVersion = escapeHtml(dep.currentVersion);
+      const safeLatestVersion = escapeHtml(dep.latestVersion);
+      const safeScopeTitle = escapeAttribute(dep.packageRoot || dep.workspaceFolder || '');
       const severityClass = this.getSeverityBorderClass(dep.severity);
       const paddingClasses = this.getDensityClasses();
       const densityClasses = `${paddingClasses} align-middle`;
@@ -609,38 +626,36 @@ if (typeof window.TableManager === 'undefined') {
 
       let html = `
       <tr class="row-main table-row-modern ${severityClass} group border-b border-gray-100/70 dark:border-gray-800/60 cursor-pointer transition-colors duration-150 hover:bg-gray-50/70 dark:hover:bg-gray-800/40 focus-within:bg-blue-50/40 dark:focus-within:bg-blue-900/20" 
-          data-package="${dep.packageName}"
-          data-row-key="${rowKey}"
+          data-package="${safePackageNameAttr}"
+          data-row-key="${safeRowKey}"
           tabindex="0" 
           role="row" 
-          aria-label="Dependency: ${dep.packageName}, Severity: ${dep.severity}, ${dep.cveIds.length} vulnerabilities">
+          aria-label="Dependency: ${safePackageNameAttr}, Severity: ${safeSeverityAttr}, ${dep.cveIds.length} vulnerabilities">
         <td class="${densityClasses}">
           <div class="flex items-center gap-3">
             <input type="checkbox" 
                    class="row-checkbox smart-checkbox-input shrink-0" 
-                   data-package="${dep.packageName}"
-                   data-row-key="${rowKey}"
-                   aria-label="Select ${dep.packageName}"
-                   ${isSelected ? 'checked' : ''}
-                   onclick="event.stopPropagation(); const checkbox = event.currentTarget; const key = checkbox.dataset.rowKey; if (window.__depPulseTableManager) { window.__depPulseTableManager.toggleRowSelection(key); }">
+                   data-package="${safePackageNameAttr}"
+                   data-row-key="${safeRowKey}"
+                   aria-label="Select ${safePackageNameAttr}"
+                   ${isSelected ? 'checked' : ''}>
             <button class="expand-toggle-modern ${isExpanded ? 'expanded' : ''} shrink-0" 
-                    data-package="${dep.packageName}"
-                    data-row-key="${rowKey}"
-                    aria-label="Toggle details for ${dep.packageName}" 
+                    data-package="${safePackageNameAttr}"
+                    data-row-key="${safeRowKey}"
+                    aria-label="Toggle details for ${safePackageNameAttr}" 
                     aria-expanded="${isExpanded}"
-                    title="Click to ${isExpanded ? 'collapse' : 'expand'} details"
-                    onclick="event.stopPropagation(); const btn = event.currentTarget; const key = btn.dataset.rowKey; if (window.__depPulseTableManager) { window.__depPulseTableManager.toggleRowExpansion(key); }">
+                    title="Click to ${isExpanded ? 'collapse' : 'expand'} details">
               <svg class="expand-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor">
                 <path d="M6 8l4 4 4-4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </button>
             <div class="flex items-center gap-2.5 min-w-0 flex-1">
-              <span class="inline-flex h-3 w-3 rounded-full ${severityDot} shrink-0 ring-2 ring-white dark:ring-gray-800 ${dep.severity === 'critical' ? 'dot-pulse-critical' : ''}" aria-hidden="true" title="Severity: ${dep.severity}"></span>
-              <span class="font-semibold text-gray-900 dark:text-gray-100 truncate">${dep.packageName}</span>
-              <span class="sr-only">Severity ${dep.severity}</span>
+              <span class="inline-flex h-3 w-3 rounded-full ${severityDot} shrink-0 ring-2 ring-white dark:ring-gray-800 ${dep.severity === 'critical' ? 'dot-pulse-critical' : ''}" aria-hidden="true" title="Severity: ${safeSeverityAttr}"></span>
+              <span class="font-semibold text-gray-900 dark:text-gray-100 truncate">${safePackageName}</span>
+              <span class="sr-only">Severity ${safeSeverity}</span>
               ${
                 shouldShowScope
-                  ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-200/80 dark:border-gray-700/80 truncate max-w-[160px]" title="${dep.packageRoot || dep.workspaceFolder}">
+                  ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border border-gray-200/80 dark:border-gray-700/80 truncate max-w-[160px]" title="${safeScopeTitle}">
                     ${this.formatWorkspaceLabel(dep)}
                   </span>`
                   : ''
@@ -656,11 +671,20 @@ if (typeof window.TableManager === 'undefined') {
                             : 'Transitive vulnerabilities detected';
                         return `
                         <span class="relative inline-flex items-center" aria-label="${tooltip}">
-                          <svg class="transitive-icon h-4 w-4 text-blue-600 dark:text-blue-300" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true">
-                            <circle cx="10" cy="10" r="8" stroke-width="1.5"></circle>
-                            <line x1="10" y1="6" x2="10" y2="11" stroke-width="1.5" stroke-linecap="round"></line>
-                            <circle cx="10" cy="14" r="1" fill="currentColor"></circle>
-                          </svg>
+                          <button class="transitive-indicator-btn inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-blue-700 dark:text-blue-200 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                                  type="button"
+                                  data-action="view-transitive"
+                                  data-package="${safePackageNameAttr}"
+                                  data-row-key="${safeRowKey}"
+                                  aria-label="${tooltip}"
+                                  title="${tooltip}">
+                            <svg class="transitive-icon h-4 w-4 text-blue-600 dark:text-blue-300" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true">
+                              <circle cx="10" cy="10" r="8" stroke-width="1.5"></circle>
+                              <line x1="10" y1="6" x2="10" y2="11" stroke-width="1.5" stroke-linecap="round"></line>
+                              <circle cx="10" cy="14" r="1" fill="currentColor"></circle>
+                            </svg>
+                            <span class="text-[10px] font-semibold">${count}</span>
+                          </button>
                           <span class="tooltip-bubble pointer-events-none absolute left-1/2 -translate-x-1/2 -top-12 flex flex-col items-center transition-all duration-150 ease-out opacity-0" aria-hidden="true">
                             <span class="px-3 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold shadow-lg shadow-slate-900/40 border border-white/10 whitespace-nowrap">
                               ${tooltip}
@@ -724,7 +748,7 @@ if (typeof window.TableManager === 'undefined') {
           visibleColumns.currentVersion
             ? `
         <td class="${densityClasses} font-mono text-sm text-gray-700 dark:text-gray-300">
-          ${dep.currentVersion}
+          ${safeCurrentVersion}
         </td>
         `
             : ''
@@ -733,7 +757,7 @@ if (typeof window.TableManager === 'undefined') {
           visibleColumns.latestVersion
             ? `
         <td class="${densityClasses} font-mono text-sm text-gray-700 dark:text-gray-300">
-          ${dep.latestVersion}
+          ${safeLatestVersion}
         </td>
         `
             : ''
@@ -792,6 +816,11 @@ if (typeof window.TableManager === 'undefined') {
       const workspaceFolder =
         this.isSinglePackageProject || !dep.workspaceFolder ? '' : dep.workspaceFolder;
       const packageRoot = this.isSinglePackageProject || !dep.packageRoot ? '' : dep.packageRoot;
+      const safePackageNameAttr = escapeAttribute(dep.packageName);
+      const safeLatestVersionAttr = escapeAttribute(dep.latestVersion);
+      const safeRowKey = escapeAttribute(rowKey);
+      const safeWorkspaceFolder = escapeAttribute(workspaceFolder);
+      const safePackageRoot = escapeAttribute(packageRoot);
 
       const needsUpdate = this.shouldShowUpdateAction(dep);
       const updateTooltipText =
@@ -819,12 +848,12 @@ if (typeof window.TableManager === 'undefined') {
           wrapWithTooltip(
             `
           <button class="table-action-btn primary update-btn" 
-                  data-package="${dep.packageName}" 
-                  data-version="${dep.latestVersion}"
-                  data-row-key="${rowKey}"
-                  data-workspace="${workspaceFolder}"
-                  data-package-root="${packageRoot}"
-                  aria-label="Update ${dep.packageName} to ${dep.latestVersion}">
+                  data-package="${safePackageNameAttr}" 
+                  data-version="${safeLatestVersionAttr}"
+                  data-row-key="${safeRowKey}"
+                  data-workspace="${safeWorkspaceFolder}"
+                  data-package-root="${safePackageRoot}"
+                  aria-label="Update ${safePackageNameAttr} to ${safeLatestVersionAttr}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M7 17L17 7"/>
               <path d="M7 7h10v10"/>
@@ -842,9 +871,9 @@ if (typeof window.TableManager === 'undefined') {
             `
           <button class="table-action-btn" 
                   data-action="view-vulns" 
-                  data-package="${dep.packageName}" 
-                  data-row-key="${rowKey}"
-                  aria-label="View ${dep.cveIds.length} vulnerability${dep.cveIds.length > 1 ? 'ies' : ''} for ${dep.packageName}">
+                  data-package="${safePackageNameAttr}" 
+                  data-row-key="${safeRowKey}"
+                  aria-label="View ${dep.cveIds.length} vulnerability${dep.cveIds.length > 1 ? 'ies' : ''} for ${safePackageNameAttr}">
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 3l7 4v5c0 4.25-3 8.25-7 9-4-0.75-7-4.75-7-9V7l7-4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
               <path d="M12 9.5a2.5 2.5 0 012.5 2.5v1a2.5 2.5 0 11-5 0v-1A2.5 2.5 0 0112 9.5z" fill="currentColor"/>
@@ -864,31 +893,33 @@ if (typeof window.TableManager === 'undefined') {
       const showAlternativesTab = dep.alternativesEligible === true;
       const showTransitiveTab = window.transitiveEnabled && dep.children && dep.children.length > 0;
       const rowKey = dep.rowKey || dep.packageName;
+      const safePackageNameAttr = escapeAttribute(dep.packageName);
+      const safeRowKey = escapeAttribute(rowKey);
 
       return `
-      <tr class="expanded-row animate-fade-in" data-package-name="${escapeAttribute(dep.packageName)}" data-row-key="${escapeAttribute(rowKey)}">
+      <tr class="expanded-row animate-fade-in" data-package-name="${safePackageNameAttr}" data-row-key="${safeRowKey}">
         <td colspan="${visibleColumnCount}" class="px-6 py-4 bg-gray-50/30 dark:bg-gray-900/30">
           <div class="ml-10 space-y-4 max-w-5xl">
             <!-- Tabbed Interface for Expanded View -->
             <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
               <!-- Tab Headers -->
               <div class="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 overflow-x-auto">
-                <button class="expanded-tab active px-4 py-3 text-sm font-medium text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 whitespace-nowrap" data-tab="overview" onclick="switchExpandedTab(event, '${rowKey}', 'overview', '${dep.packageName}')">
+                <button class="expanded-tab active px-4 py-3 text-sm font-medium text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 whitespace-nowrap" data-tab="overview" data-row-key="${safeRowKey}" data-package="${safePackageNameAttr}">
                   Overview
                 </button>
-                <button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="vulnerabilities" onclick="switchExpandedTab(event, '${rowKey}', 'vulnerabilities', '${dep.packageName}')">
+                <button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="vulnerabilities" data-row-key="${safeRowKey}" data-package="${safePackageNameAttr}">
                   Vulnerabilities ${dep.cveIds.length > 0 ? `(${dep.cveIds.length})` : ''}
                 </button>
                 ${
                   dep.compatibility && dep.compatibility.issues.length > 0
-                    ? `<button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="compatibility" onclick="switchExpandedTab(event, '${rowKey}', 'compatibility', '${dep.packageName}')">
+                    ? `<button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="compatibility" data-row-key="${safeRowKey}" data-package="${safePackageNameAttr}">
                         Compatibility ${dep.compatibility.issues.length > 0 ? `(${dep.compatibility.issues.length})` : ''}
                       </button>`
                     : ''
                 }
                 ${
                   dep.license
-                    ? `<button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="license" onclick="switchExpandedTab(event, '${rowKey}', 'license', '${dep.packageName}')">
+                    ? `<button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="license" data-row-key="${safeRowKey}" data-package="${safePackageNameAttr}">
                         <span class="inline-flex items-center gap-1.5">
                           License
                           ${
@@ -904,17 +935,17 @@ if (typeof window.TableManager === 'undefined') {
                 }
                 ${
                   showTransitiveTab
-                    ? `<button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="transitive" onclick="switchExpandedTab(event, '${rowKey}', 'transitive', '${dep.packageName}')">
+                    ? `<button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="transitive" data-row-key="${safeRowKey}" data-package="${safePackageNameAttr}">
                     Transitive Dependencies
                   </button>`
                     : ''
                 }
-                <button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="actions" onclick="switchExpandedTab(event, '${rowKey}', 'actions', '${dep.packageName}')">
+                <button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="actions" data-row-key="${safeRowKey}" data-package="${safePackageNameAttr}">
                   Actions
                 </button>
                 ${
                   showAlternativesTab
-                    ? `<button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="alternatives" onclick="switchExpandedTab(event, '${rowKey}', 'alternatives', '${dep.packageName}')">
+                    ? `<button class="expanded-tab px-4 py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 whitespace-nowrap" data-tab="alternatives" data-row-key="${safeRowKey}" data-package="${safePackageNameAttr}">
                     Alternatives
                   </button>`
                     : ''
@@ -978,6 +1009,12 @@ if (typeof window.TableManager === 'undefined') {
       const workspaceFolder =
         this.isSinglePackageProject || !dep.workspaceFolder ? '' : dep.workspaceFolder;
       const packageRoot = this.isSinglePackageProject || !dep.packageRoot ? '' : dep.packageRoot;
+      const safePackageNameAttr = escapeAttribute(dep.packageName);
+      const safeLatestVersion = escapeHtml(dep.latestVersion);
+      const safeLatestVersionAttr = escapeAttribute(dep.latestVersion);
+      const safeRowKey = escapeAttribute(rowKey);
+      const safeWorkspaceFolder = escapeAttribute(workspaceFolder);
+      const safePackageRoot = escapeAttribute(packageRoot);
       const sections = [];
       // Validate and normalize repository URL - only use repositoryUrl, not homepageUrl
       // Only show repository link if it's from a valid open source hosting service
@@ -1019,17 +1056,17 @@ if (typeof window.TableManager === 'undefined') {
       if (this.shouldShowUpdateAction(dep)) {
         remediationButtons.push(`
         <button class="action-tab-btn primary update-btn" 
-                data-package="${dep.packageName}" 
-                data-version="${dep.latestVersion}"
-                data-row-key="${rowKey}"
-                data-workspace="${workspaceFolder}"
-                data-package-root="${packageRoot}"
+                data-package="${safePackageNameAttr}" 
+                data-version="${safeLatestVersionAttr}"
+                data-row-key="${safeRowKey}"
+                data-workspace="${safeWorkspaceFolder}"
+                data-package-root="${safePackageRoot}"
                 type="button">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M7 17L17 7"/>
             <path d="M7 7h10v10"/>
           </svg>
-          Update to ${dep.latestVersion}
+          Update to ${safeLatestVersion}
         </button>
       `);
       }
@@ -1049,8 +1086,8 @@ if (typeof window.TableManager === 'undefined') {
         `<button class="action-tab-btn" 
                 type="button"
                 data-action="open-link"
-                data-url="https://www.npmjs.com/package/${dep.packageName}"
-                data-announce="Opening npm page for ${dep.packageName}">
+                data-url="https://www.npmjs.com/package/${safePackageNameAttr}"
+                data-announce="Opening npm page for ${safePackageNameAttr}">
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
             <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
             <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
@@ -1065,7 +1102,7 @@ if (typeof window.TableManager === 'undefined') {
                 type="button"
                 data-action="open-link"
                 data-url="${escapeAttribute(repoLink)}"
-                data-announce="Opening repository for ${dep.packageName}">
+                data-announce="Opening repository for ${safePackageNameAttr}">
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
             <path d="M4 4a2 2 0 012-2h3.5a1 1 0 010 2H6v12h8V9.5a1 1 0 112 0V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"/>
             <path d="M13 2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 11-2 0V3h-1a1 1 0 01-1-1z"/>
@@ -1164,16 +1201,19 @@ if (typeof window.TableManager === 'undefined') {
           const vulnBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
             ${node.cveIds.length} Vulnerability${node.cveIds.length > 1 ? 'ies' : ''}
           </span>`;
+          const safeNodePackageName = escapeHtml(node.packageName);
+          const safeNodeCurrentVersion = escapeHtml(node.currentVersion);
+          const safePathLabel = escapeHtml(pathLabel);
 
           return `
             <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-white dark:bg-gray-800">
               <div class="flex items-start justify-between gap-2">
                 <div class="space-y-1">
                   <div class="flex items-center gap-2">
-                    <span class="font-medium text-gray-900 dark:text-gray-100">${node.packageName}</span>
-                    <span class="font-mono text-xs text-gray-500 dark:text-gray-400">${node.currentVersion}</span>
+                    <span class="font-medium text-gray-900 dark:text-gray-100">${safeNodePackageName}</span>
+                    <span class="font-mono text-xs text-gray-500 dark:text-gray-400">${safeNodeCurrentVersion}</span>
                   </div>
-                  <div class="text-xs text-gray-500 dark:text-gray-400 break-all">Path: ${pathLabel}</div>
+                  <div class="text-xs text-gray-500 dark:text-gray-400 break-all">Path: ${safePathLabel}</div>
                 </div>
                 <div class="flex items-center gap-2">
                   ${severityChip}
@@ -1240,7 +1280,7 @@ if (typeof window.TableManager === 'undefined') {
           <button
             class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-[10px] text-gray-700 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors group relative"
             type="button"
-            onclick="resetLlmConfig()"
+            data-action="reset-llm-config"
             title="Reset all LLM API keys and models"
           >
             <span class="group-hover:hidden">↺</span>
@@ -1282,7 +1322,7 @@ if (typeof window.TableManager === 'undefined') {
                      target="_blank"
                      rel="noopener noreferrer"
                      class="font-mono text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline">
-                    ${vuln.id} 🔗
+                    ${escapeHtml(vuln.id)} 🔗
                   </a>
                   ${this.renderSourceBadge(vuln.source)}
                 </div>
@@ -1296,14 +1336,14 @@ if (typeof window.TableManager === 'undefined') {
                   vuln.vectorString
                     ? `
                   <p class="font-mono text-xs break-all" title="CVSS Vector String">
-                    <strong>Vector:</strong> ${vuln.vectorString}
+                    <strong>Vector:</strong> ${escapeHtml(vuln.vectorString)}
                   </p>
                 `
                     : ''
                 }
               </div>
               <p class="text-sm text-gray-700 dark:text-gray-300 mt-2">
-                <strong>Recommendation:</strong> Update to version ${dep.latestVersion} or later
+                <strong>Recommendation:</strong> Update to version ${escapeHtml(dep.latestVersion)} or later
               </p>
             </div>
           `
@@ -1360,11 +1400,11 @@ if (typeof window.TableManager === 'undefined') {
         <div class="grid grid-cols-2 gap-3 text-sm">
           <div>
             <span class="text-gray-600 dark:text-gray-400">Current Version:</span>
-            <span class="font-mono ml-2 text-gray-900 dark:text-gray-100">${dep.currentVersion}</span>
+            <span class="font-mono ml-2 text-gray-900 dark:text-gray-100">${escapeHtml(dep.currentVersion)}</span>
           </div>
           <div>
             <span class="text-gray-600 dark:text-gray-400">Latest Version:</span>
-            <span class="font-mono ml-2 text-gray-900 dark:text-gray-100">${dep.latestVersion}</span>
+            <span class="font-mono ml-2 text-gray-900 dark:text-gray-100">${escapeHtml(dep.latestVersion)}</span>
           </div>
           <div>
             <span class="text-gray-600 dark:text-gray-400">Freshness:</span>
@@ -2613,6 +2653,22 @@ if (typeof window.TableManager === 'undefined') {
         requestAnimationFrame(() => focusVulnTab());
       } else {
         focusVulnTab();
+      }
+    }
+
+    showTransitiveDependencies(rowKey, packageName) {
+      const focusTransitiveTab = () => {
+        if (typeof window.switchExpandedTab === 'function') {
+          window.switchExpandedTab(null, rowKey, 'transitive', packageName || rowKey);
+        }
+      };
+
+      if (this.expandedRow !== rowKey) {
+        this.expandedRow = rowKey;
+        this.render();
+        requestAnimationFrame(() => focusTransitiveTab());
+      } else {
+        focusTransitiveTab();
       }
     }
 

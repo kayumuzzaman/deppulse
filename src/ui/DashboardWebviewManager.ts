@@ -1,3 +1,4 @@
+import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as vscode from 'vscode';
 import type { WebviewMessage } from '../types';
@@ -266,6 +267,7 @@ export class DashboardWebviewManager {
    * @returns HTML string
    */
   private getWebviewContent(webview: vscode.Webview): string {
+    const nonce = crypto.randomBytes(16).toString('base64');
     // Get URIs for dashboard modules (load in dependency order)
     const stateScriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, 'resources', 'webview', 'dashboard-state.js')
@@ -313,9 +315,9 @@ export class DashboardWebviewManager {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https: data:; style-src ${webview.cspSource} 'unsafe-inline' vscode-resource: https:; script-src 'unsafe-inline' ${webview.cspSource} vscode-resource: https:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https: data:; style-src ${webview.cspSource} 'unsafe-inline' https:; script-src 'nonce-${nonce}' ${webview.cspSource};">
   <title>DepPulse Dashboard</title>
-  <script>
+  <script nonce="${nonce}">
     window.isDevelopment = ${this.extensionMode === vscode.ExtensionMode.Development};
   </script>
   
@@ -346,8 +348,8 @@ export class DashboardWebviewManager {
   </style>
   
   <!-- Local Chart.js -->
-  <script src="${chartJsUri}"></script>
-  <script src="${cleanupScriptUri}"></script>
+  <script nonce="${nonce}" src="${chartJsUri}"></script>
+  <script nonce="${nonce}" src="${cleanupScriptUri}"></script>
   
 
 </head>
@@ -1310,12 +1312,12 @@ export class DashboardWebviewManager {
   </div>
 
   <!-- Dashboard Modules (load in dependency order) -->
-  <script src="${stateScriptUri}"></script>
-  <script src="${utilsScriptUri}"></script>
-  <script src="${chartsScriptUri}"></script>
-  <script src="${filtersScriptUri}"></script>
-  <script src="${tableScriptUri}"></script>
-  <script src="${coreScriptUri}"></script>
+  <script nonce="${nonce}" src="${stateScriptUri}"></script>
+  <script nonce="${nonce}" src="${utilsScriptUri}"></script>
+  <script nonce="${nonce}" src="${chartsScriptUri}"></script>
+  <script nonce="${nonce}" src="${filtersScriptUri}"></script>
+  <script nonce="${nonce}" src="${tableScriptUri}"></script>
+  <script nonce="${nonce}" src="${coreScriptUri}"></script>
 </body>
 </html>`;
   }

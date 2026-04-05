@@ -5,11 +5,28 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { finished } from 'node:stream/promises';
 import { DepPulseError, ErrorCode } from '../types';
+import type { CommandSpec } from './CommandExecutor';
 import { Logger } from './Logger';
 
 export interface StreamedCommandResult {
   filePath: string;
   stderr: string;
+}
+
+function resolveExecutable(command: string): string {
+  if (process.platform !== 'win32') {
+    return command;
+  }
+
+  switch (command.toLowerCase()) {
+    case 'npm':
+    case 'npx':
+    case 'pnpm':
+    case 'yarn':
+      return `${command}.cmd`;
+    default:
+      return command;
+  }
 }
 
 /**
@@ -33,20 +50,24 @@ export class StreamedCommandExecutor {
    * Returns the temp file path for downstream parsing.
    */
   public async executeToFile(
-    command: string,
+    command: CommandSpec,
     cwd: string,
     timeout: number = 20000
   ): Promise<StreamedCommandResult> {
+    const resolvedCommand = {
+      ...command,
+      command: resolveExecutable(command.command),
+    };
     const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'dep-pulse-'));
     const filePath = path.join(tempDir, 'stdout.json');
     const stdoutStream = fs.createWriteStream(filePath);
 
-    this.logger.debug(`Streaming command: ${command} in ${cwd} to ${filePath}`);
+    const commandLabel = [command.command, ...(command.args ?? [])].join(' ');
+    this.logger.debug(`Streaming command: ${commandLabel} in ${cwd} to ${filePath}`);
 
     return new Promise<StreamedCommandResult>((resolve, reject) => {
-      const child = spawn(command, {
+      const child = spawn(resolvedCommand.command, resolvedCommand.args ?? [], {
         cwd,
-        shell: true,
       });
 
       let stderr = '';
@@ -75,7 +96,12 @@ export class StreamedCommandExecutor {
       };
 
       child.on('error', (err) => {
-        fail(`Command error: ${command}. ${err instanceof Error ? err.message : String(err)}`);
+        const code = err && typeof err === 'object' && 'code' in err ? err.code : undefined;
+        if (code === 'ENOENT') {
+          fail(`Command not found: ${commandLabel}`, { code });
+          return;
+        }
+        fail(`Command error: ${commandLabel}. ${err instanceof Error ? err.message : String(err)}`);
       });
 
       child.on('close', async (code) => {
@@ -85,14 +111,14 @@ export class StreamedCommandExecutor {
           finishedStream = true;
         } catch (streamErr) {
           return fail(
-            `Failed to finalize stdout stream for ${command}: ${
+            `Failed to finalize stdout stream for ${commandLabel}: ${
               streamErr instanceof Error ? streamErr.message : String(streamErr)
             }`
           );
         }
 
         if (code !== 0) {
-          return fail(`Command failed: ${command}`, { code });
+          return fail(`Command failed: ${commandLabel}`, { code });
         }
 
         resolve({ filePath, stderr });

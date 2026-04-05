@@ -39,9 +39,18 @@ describe('UnusedPackageCleaner', () => {
   });
 
   it('builds knip commands per package manager', () => {
-    expect(cleaner.buildKnipCommand('npm')).toContain('npx --yes knip');
-    expect(cleaner.buildKnipCommand('pnpm')).toContain('pnpm dlx knip');
-    expect(cleaner.buildKnipCommand('yarn')).toContain('yarn dlx knip');
+    expect(cleaner.buildKnipCommand('npm')).toEqual({
+      command: 'npx',
+      args: ['--yes', 'knip', '--dependencies', '--reporter', 'json'],
+    });
+    expect(cleaner.buildKnipCommand('pnpm')).toEqual({
+      command: 'pnpm',
+      args: ['dlx', 'knip', '--dependencies', '--reporter', 'json'],
+    });
+    expect(cleaner.buildKnipCommand('yarn')).toEqual({
+      command: 'yarn',
+      args: ['dlx', 'knip', '--dependencies', '--reporter', 'json'],
+    });
   });
 
   it('parses knip output from issues array', () => {
@@ -155,7 +164,10 @@ describe('UnusedPackageCleaner', () => {
       }
     );
 
-    expect(commands).toEqual(['pnpm remove alpha beta', 'pnpm remove -D gamma']);
+    expect(commands).toEqual([
+      { command: 'pnpm', args: ['remove', 'alpha', 'beta'] },
+      { command: 'pnpm', args: ['remove', '-D', 'gamma'] },
+    ]);
   });
 
   it('parses knip output with file mapping for monorepos', () => {

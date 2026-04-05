@@ -24,7 +24,7 @@ This project adheres to a Code of Conduct that all contributors are expected to 
 
 Before you begin, ensure you have the following installed:
 
-- **Node.js**: 18.0.0 or higher
+- **Node.js**: 20.18.1 or higher
 - **pnpm**: Latest version (we use pnpm, not npm)
 - **VS Code**: 1.80.0 or higher (for development)
 - **Git**: For version control
@@ -477,4 +477,3 @@ Use the feature request template and include:
 ---
 
 Thank you for contributing to DepPulse! 🎉
-

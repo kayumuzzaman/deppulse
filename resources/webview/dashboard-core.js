@@ -272,9 +272,34 @@ const domContentLoadedHandler = () => {
             );
           }
           break;
+        case 'open-settings':
+          if (typeof openDepPulseSettings === 'function') {
+            openDepPulseSettings(
+              actionBtn.dataset.settingKey,
+              actionBtn.dataset.provider,
+              actionBtn.dataset.scope
+            );
+          }
+          break;
         case 'open-link':
           if (typeof openExternalLink === 'function') {
             openExternalLink(actionBtn.dataset.url, actionBtn.dataset.announce);
+          }
+          break;
+        case 'retry-analysis':
+          errorHandler.handleRetry();
+          break;
+        case 'view-logs':
+          errorHandler.viewLogs();
+          break;
+        case 'reset-llm-config':
+          if (typeof resetLlmConfig === 'function') {
+            resetLlmConfig();
+          }
+          break;
+        case 'view-transitive':
+          if (typeof tableManager !== 'undefined' && tableManager) {
+            tableManager.showTransitiveDependencies(rowKey, packageName);
           }
           break;
         default:
@@ -287,8 +312,8 @@ const domContentLoadedHandler = () => {
 
     // Handle row checkbox
     if (e.target.classList.contains('row-checkbox')) {
-      const packageName = e.target.dataset.package;
-      Logger.log('[Dashboard] Row checkbox clicked for:', packageName);
+      const rowKey = e.target.dataset.rowKey || e.target.dataset.package;
+      Logger.log('[Dashboard] Row checkbox clicked for:', rowKey);
       // Try multiple ways to access tableManager
       const manager =
         window.__depPulseTableManager ||
@@ -296,7 +321,7 @@ const domContentLoadedHandler = () => {
         window.tableManager;
       if (manager) {
         Logger.log('[Dashboard] Calling toggleRowSelection on manager');
-        manager.toggleRowSelection(packageName);
+        manager.toggleRowSelection(rowKey);
       } else {
         Logger.error('[Dashboard] tableManager not found!', {
           hasDepPulse: !!window.__depPulseTableManager,
@@ -304,6 +329,11 @@ const domContentLoadedHandler = () => {
           hasWindowTableManager: !!window.tableManager,
         });
       }
+      e.stopPropagation();
+      return;
+    }
+
+    if (e.target.id === 'select-all') {
       e.stopPropagation();
       return;
     }
@@ -342,9 +372,23 @@ const domContentLoadedHandler = () => {
     // Expand via dedicated toggle
     const expandToggle = e.target.closest('.expand-toggle-modern');
     if (expandToggle) {
-      const packageName = expandToggle.dataset.package;
+      const rowKey = expandToggle.dataset.rowKey || expandToggle.dataset.package;
       if (typeof tableManager !== 'undefined' && tableManager) {
-        tableManager.toggleRowExpansion(packageName);
+        tableManager.toggleRowExpansion(rowKey);
+      }
+      return;
+    }
+
+    const expandedTab = e.target.closest('.expanded-tab');
+    if (expandedTab) {
+      e.stopPropagation();
+      if (typeof window.switchExpandedTab === 'function') {
+        window.switchExpandedTab(
+          e,
+          expandedTab.dataset.rowKey,
+          expandedTab.dataset.tab,
+          expandedTab.dataset.package
+        );
       }
       return;
     }
@@ -357,9 +401,9 @@ const domContentLoadedHandler = () => {
       !e.target.closest('a') &&
       !e.target.closest('input')
     ) {
-      const packageName = rowMain.dataset.package;
+      const rowKey = rowMain.dataset.rowKey || rowMain.dataset.package;
       if (typeof tableManager !== 'undefined' && tableManager) {
-        tableManager.toggleRowExpansion(packageName);
+        tableManager.toggleRowExpansion(rowKey);
       }
     }
   });
@@ -767,16 +811,19 @@ function handleAlternativesError(data) {
     const showKeyButton = missingKey || (!missingModel && keyHint);
     const showModelButton = missingModel || (!missingKey && modelHint);
     const uncertain = !showKeyButton && !showModelButton;
+    const safeProvider = escapeAttribute(provider ?? '');
+    const safeModelSetting = escapeAttribute(modelSetting);
+    const safeSettingQuery = escapeAttribute(settingQuery);
 
     const buttons = [];
     if (showKeyButton || uncertain) {
       buttons.push(
-        `<button class="action-tab-btn text-xs px-3 py-1" type="button" onclick="openDepPulseSettings('', '${provider}', 'key')">Config Key</button>`
+        `<button class="action-tab-btn text-xs px-3 py-1" type="button" data-action="open-settings" data-setting-key="" data-provider="${safeProvider}" data-scope="key">Config Key</button>`
       );
     }
     if (showModelButton || uncertain) {
       buttons.push(
-        `<button class="action-tab-btn primary text-xs px-3 py-1" type="button" onclick="openDepPulseSettings('${modelSetting}', '${provider ?? ''}', 'model')">Config Model</button>`
+        `<button class="action-tab-btn primary text-xs px-3 py-1" type="button" data-action="open-settings" data-setting-key="${safeModelSetting}" data-provider="${safeProvider}" data-scope="model">Config Model</button>`
       );
     }
 
@@ -791,7 +838,7 @@ function handleAlternativesError(data) {
               ${
                 buttons.length > 0
                   ? buttons.join('')
-                  : `<button class="action-tab-btn primary text-xs px-3 py-1" type="button" onclick="openDepPulseSettings('${settingQuery}', '${provider ?? ''}', 'both')">Open DepPulse settings</button>`
+                  : `<button class="action-tab-btn primary text-xs px-3 py-1" type="button" data-action="open-settings" data-setting-key="${safeSettingQuery}" data-provider="${safeProvider}" data-scope="both">Open DepPulse settings</button>`
               }
             </div>
           </div>
@@ -835,10 +882,10 @@ function handleAlternativesConfigRequired(data) {
           <div class="font-semibold text-slate-900 dark:text-slate-100">OpenRouter</div>
           <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Set both API key and model (e.g., gpt-4o-mini).</p>
           <div class="mt-auto flex gap-2 flex-nowrap overflow-x-auto">
-            <button class="action-tab-btn text-xs px-3 py-1" type="button" onclick="openDepPulseSettings('', 'openrouter', 'key')">
+            <button class="action-tab-btn text-xs px-3 py-1" type="button" data-action="open-settings" data-setting-key="" data-provider="openrouter" data-scope="key">
               Config Key
             </button>
-            <button class="action-tab-btn primary text-xs px-3 py-1" type="button" onclick="openDepPulseSettings('depPulse.api.openRouterModel', '', 'model')">
+            <button class="action-tab-btn primary text-xs px-3 py-1" type="button" data-action="open-settings" data-setting-key="depPulse.api.openRouterModel" data-provider="" data-scope="model">
               Config Model
             </button>
           </div>
@@ -848,10 +895,10 @@ function handleAlternativesConfigRequired(data) {
           <div class="font-semibold text-slate-900 dark:text-slate-100">OpenAI</div>
           <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Set both API key and model (e.g., gpt-4o-mini).</p>
           <div class="mt-auto flex gap-2 flex-nowrap overflow-x-auto">
-            <button class="action-tab-btn text-xs px-3 py-1" type="button" onclick="openDepPulseSettings('', 'openai', 'key')">
+            <button class="action-tab-btn text-xs px-3 py-1" type="button" data-action="open-settings" data-setting-key="" data-provider="openai" data-scope="key">
               Config Key
             </button>
-            <button class="action-tab-btn primary text-xs px-3 py-1" type="button" onclick="openDepPulseSettings('depPulse.api.openaiModel', '', 'model')">
+            <button class="action-tab-btn primary text-xs px-3 py-1" type="button" data-action="open-settings" data-setting-key="depPulse.api.openaiModel" data-provider="" data-scope="model">
               Config Model
             </button>
           </div>
@@ -861,10 +908,10 @@ function handleAlternativesConfigRequired(data) {
           <div class="font-semibold text-slate-900 dark:text-slate-100">Google Gemini</div>
           <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Set both API key and model (e.g., gemini-1.5-flash).</p>
           <div class="mt-auto flex gap-2 flex-nowrap overflow-x-auto">
-            <button class="action-tab-btn text-xs px-3 py-1" type="button" onclick="openDepPulseSettings('', 'gemini', 'key')">
+            <button class="action-tab-btn text-xs px-3 py-1" type="button" data-action="open-settings" data-setting-key="" data-provider="gemini" data-scope="key">
               Config Key
             </button>
-            <button class="action-tab-btn primary text-xs px-3 py-1" type="button" onclick="openDepPulseSettings('depPulse.api.geminiModel', '', 'model')">
+            <button class="action-tab-btn primary text-xs px-3 py-1" type="button" data-action="open-settings" data-setting-key="depPulse.api.geminiModel" data-provider="" data-scope="model">
               Config Model
             </button>
           </div>
@@ -898,7 +945,9 @@ function renderAlternativeCard(suggestion) {
       <div class="mt-3 flex flex-wrap gap-2">
         <button class="action-tab-btn primary"
                 type="button"
-                onclick="copyInstallCommand('${escapeAttribute(suggestion.installCommand)}')">
+                data-action="copy-install"
+                data-value="${escapeAttribute(suggestion.installCommand)}"
+                data-announce="Install command copied to clipboard">
           Copy install: ${escapeAttribute(suggestion.installCommand.split(' ')[0])}
         </button>
         <button class="action-tab-btn"
@@ -2316,11 +2365,13 @@ class ErrorHandler {
           ${safeUserMessage}
         </p>
         <div class="flex gap-3">
-          <button onclick="errorHandler.handleRetry()" 
+          <button type="button"
+                  data-action="retry-analysis" 
                   class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md font-medium transition-colors">
             Retry
           </button>
-          <button onclick="errorHandler.viewLogs()" 
+          <button type="button"
+                  data-action="view-logs" 
                   class="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 rounded-md font-medium transition-colors">
             View Logs
           </button>
