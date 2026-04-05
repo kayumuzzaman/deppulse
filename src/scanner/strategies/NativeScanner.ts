@@ -5,6 +5,7 @@ import * as readline from 'node:readline';
 import * as vscode from 'vscode';
 import type { Dependency, DependencyFile, ProjectInfo } from '../../types';
 import { DepPulseError, ErrorCode } from '../../types';
+import type { CommandSpec } from '../../utils/CommandExecutor';
 import { Logger } from '../../utils/Logger';
 import { StreamedCommandExecutor } from '../../utils/StreamedCommandExecutor';
 import { parseJsonFile, resolveFile } from '../../utils/StreamJson';
@@ -12,7 +13,7 @@ import type { ScannerStrategy } from './ScannerStrategy';
 
 interface CliAdapter {
   isSupported(path: string): Promise<boolean>;
-  getCommand(): string;
+  getCommand(): CommandSpec;
   parseFile(filePath: string): Promise<Dependency[]>;
 }
 
@@ -36,9 +37,11 @@ class NpmCliAdapter implements CliAdapter {
     }
   }
 
-  getCommand(): string {
-    // Remove --depth=0 to get full tree
-    return 'npm list --all --json';
+  getCommand(): CommandSpec {
+    return {
+      command: 'npm',
+      args: ['list', '--all', '--json'],
+    };
   }
 
   async parseFile(filePath: string): Promise<Dependency[]> {
@@ -97,9 +100,11 @@ class PnpmCliAdapter implements CliAdapter {
     }
   }
 
-  getCommand(): string {
-    // Use --depth Infinity to get full tree (transitive dependencies)
-    return 'pnpm list --json --depth Infinity';
+  getCommand(): CommandSpec {
+    return {
+      command: 'pnpm',
+      args: ['list', '--json', '--depth', 'Infinity'],
+    };
   }
 
   async parseFile(filePath: string): Promise<Dependency[]> {
@@ -205,9 +210,11 @@ class YarnCliAdapter implements CliAdapter {
     }
   }
 
-  getCommand(): string {
-    // yarn list --json defaults to showing the full tree (transitive dependencies)
-    return 'yarn list --json';
+  getCommand(): CommandSpec {
+    return {
+      command: 'yarn',
+      args: ['list', '--json'],
+    };
   }
 
   async parseFile(filePath: string): Promise<Dependency[]> {
@@ -366,7 +373,9 @@ export class NativeScanner implements ScannerStrategy {
         this.logger.info(`Using adapter ${adapter.constructor.name} for ${packageDir}`);
 
         const command = adapter.getCommand();
-        this.logger.debug(`Executing command: ${command} in ${packageDir}`);
+        this.logger.debug(
+          `Executing command: ${command.command} ${(command.args ?? []).join(' ')} in ${packageDir}`
+        );
         const { filePath } = await this.executor.executeToFile(command, packageDir);
         const resolvedFile = resolveFile(filePath);
         const stat = await fs.stat(resolvedFile).catch(() => undefined);

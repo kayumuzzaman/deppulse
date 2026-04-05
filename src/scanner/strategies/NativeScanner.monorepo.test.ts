@@ -92,7 +92,7 @@ describe('NativeScanner monorepo per-package scanning', () => {
       return '';
     });
 
-    executeToFileMock.mockImplementation(async (_command: string, cwd: string) => {
+    executeToFileMock.mockImplementation(async (_command: unknown, cwd: string) => {
       if (cwd === '/repo') {
         return {
           filePath: await writeTempJson([
@@ -143,7 +143,7 @@ describe('NativeScanner monorepo per-package scanning', () => {
       return '';
     });
 
-    executeToFileMock.mockImplementation(async (_command: string, cwd: string) => {
+    executeToFileMock.mockImplementation(async (_command: unknown, cwd: string) => {
       if (cwd === '/repo') {
         return {
           filePath: await writeTempJson([
@@ -166,9 +166,12 @@ describe('NativeScanner monorepo per-package scanning', () => {
     await scanner.scan('/repo');
 
     // Should prefer pnpm adapter (root lock) over npm fallback
-    expect(executeToFileMock).toHaveBeenCalledWith(expect.stringContaining('pnpm list'), '/repo');
     expect(executeToFileMock).toHaveBeenCalledWith(
-      expect.stringContaining('pnpm list'),
+      expect.objectContaining({ command: 'pnpm', args: expect.arrayContaining(['list']) }),
+      '/repo'
+    );
+    expect(executeToFileMock).toHaveBeenCalledWith(
+      expect.objectContaining({ command: 'pnpm', args: expect.arrayContaining(['list']) }),
       '/repo/packages/a'
     );
   });

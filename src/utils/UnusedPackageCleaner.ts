@@ -2,7 +2,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { DepPulseError, ErrorCode, type ProjectInfo } from '../types';
-import { CommandExecutor } from './CommandExecutor';
+import { CommandExecutor, type CommandSpec } from './CommandExecutor';
 import { Logger } from './Logger';
 
 export type PackageManager = 'npm' | 'pnpm' | 'yarn';
@@ -31,6 +31,8 @@ export interface CleanupPlan {
   target: CleanupTarget;
   report: UnusedDependencyReport;
 }
+
+export interface RemovalCommand extends CommandSpec {}
 
 export class UnusedPackageCleaner {
   private readonly logger = Logger.getInstance();
@@ -195,15 +197,23 @@ export class UnusedPackageCleaner {
    * Build the knip invocation for the chosen package manager.
    * JSON reporter is used to keep stdout parseable.
    */
-  buildKnipCommand(manager: PackageManager): string {
-    const base =
-      manager === 'pnpm'
-        ? 'pnpm dlx knip'
-        : manager === 'yarn'
-          ? 'yarn dlx knip'
-          : 'npx --yes knip';
-
-    return `${base} --dependencies --reporter json`;
+  buildKnipCommand(manager: PackageManager): CommandSpec {
+    if (manager === 'pnpm') {
+      return {
+        command: 'pnpm',
+        args: ['dlx', 'knip', '--dependencies', '--reporter', 'json'],
+      };
+    }
+    if (manager === 'yarn') {
+      return {
+        command: 'yarn',
+        args: ['dlx', 'knip', '--dependencies', '--reporter', 'json'],
+      };
+    }
+    return {
+      command: 'npx',
+      args: ['--yes', 'knip', '--dependencies', '--reporter', 'json'],
+    };
   }
 
   /**
@@ -218,7 +228,7 @@ export class UnusedPackageCleaner {
     const command = this.buildKnipCommand(target.packageManager);
     const scanType = target.isRootScan ? 'root (all workspaces)' : 'package';
     this.logger.info(
-      `Running knip for ${target.packageRoot} (${scanType}) using ${target.packageManager} (${command})`
+      `Running knip for ${target.packageRoot} (${scanType}) using ${target.packageManager} (${command.command} ${(command.args ?? []).join(' ')})`
     );
 
     try {
@@ -519,28 +529,28 @@ export class UnusedPackageCleaner {
   /**
    * Build removal commands per target and report.
    */
-  buildRemovalCommands(target: CleanupTarget, report: UnusedDependencyReport): string[] {
-    const commands: string[] = [];
+  buildRemovalCommands(target: CleanupTarget, report: UnusedDependencyReport): RemovalCommand[] {
+    const commands: RemovalCommand[] = [];
     const uniqueDeps = Array.from(new Set(report.dependencies));
     const uniqueDevDeps = Array.from(new Set(report.devDependencies));
 
     if (uniqueDeps.length > 0) {
       if (target.packageManager === 'pnpm') {
-        commands.push(`pnpm remove ${uniqueDeps.join(' ')}`);
+        commands.push({ command: 'pnpm', args: ['remove', ...uniqueDeps] });
       } else if (target.packageManager === 'yarn') {
-        commands.push(`yarn remove ${uniqueDeps.join(' ')}`);
+        commands.push({ command: 'yarn', args: ['remove', ...uniqueDeps] });
       } else {
-        commands.push(`npm uninstall ${uniqueDeps.join(' ')}`);
+        commands.push({ command: 'npm', args: ['uninstall', ...uniqueDeps] });
       }
     }
 
     if (uniqueDevDeps.length > 0) {
       if (target.packageManager === 'pnpm') {
-        commands.push(`pnpm remove -D ${uniqueDevDeps.join(' ')}`);
+        commands.push({ command: 'pnpm', args: ['remove', '-D', ...uniqueDevDeps] });
       } else if (target.packageManager === 'yarn') {
-        commands.push(`yarn remove ${uniqueDevDeps.join(' ')}`);
+        commands.push({ command: 'yarn', args: ['remove', ...uniqueDevDeps] });
       } else {
-        commands.push(`npm uninstall -D ${uniqueDevDeps.join(' ')}`);
+        commands.push({ command: 'npm', args: ['uninstall', '-D', ...uniqueDevDeps] });
       }
     }
 
@@ -550,7 +560,7 @@ export class UnusedPackageCleaner {
   /**
    * Execute a package manager command in the specified working directory.
    */
-  async executeCommand(command: string, cwd: string): Promise<void> {
+  async executeCommand(command: RemovalCommand, cwd: string): Promise<void> {
     await this.executor.execute(command, cwd, 120_000);
   }
 

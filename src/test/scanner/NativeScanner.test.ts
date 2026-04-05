@@ -112,7 +112,7 @@ describe('NativeScanner Tests', () => {
     expect(result.dependencies[1].name).toBe('lodash');
 
     expect(executeToFileMock).toHaveBeenCalledWith(
-      expect.stringContaining('npm list'),
+      expect.objectContaining({ command: 'npm', args: expect.arrayContaining(['list']) }),
       '/test/dir'
     );
   });
@@ -161,7 +161,7 @@ describe('NativeScanner Tests', () => {
     expect(ts?.isDev).toBe(true);
 
     expect(executeToFileMock).toHaveBeenCalledWith(
-      expect.stringContaining('pnpm list'),
+      expect.objectContaining({ command: 'pnpm', args: expect.arrayContaining(['list']) }),
       '/test/dir'
     );
   });
@@ -182,7 +182,7 @@ describe('NativeScanner Tests', () => {
 
     // Should default to npm command
     expect(executeToFileMock).toHaveBeenCalledWith(
-      expect.stringContaining('npm list'),
+      expect.objectContaining({ command: 'npm', args: expect.arrayContaining(['list']) }),
       '/test/dir'
     );
   });
@@ -219,7 +219,7 @@ describe('NativeScanner Tests', () => {
 
     expect(result.dependencies.length).toBeGreaterThanOrEqual(2000);
     expect(executeToFileMock).toHaveBeenCalledWith(
-      expect.stringContaining('pnpm list'),
+      expect.objectContaining({ command: 'pnpm', args: expect.arrayContaining(['list']) }),
       '/test/dir'
     );
   });

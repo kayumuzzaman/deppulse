@@ -109,6 +109,7 @@
 
   function renderStatus() {
     if (!els.status) return;
+    const safeError = escapeHtml(state.error || 'Unknown error');
     let content = '';
     switch (state.status) {
       case 'loading':
@@ -121,7 +122,7 @@
         content = `<div class="text-sm text-gray-600 dark:text-gray-300">No unused dependencies detected.</div>`;
         break;
       case 'error':
-        content = `<div class="text-sm text-red-700 dark:text-red-400">Unable to fetch unused dependencies: ${state.error || 'Unknown error'}</div>`;
+        content = `<div class="text-sm text-red-700 dark:text-red-400">Unable to fetch unused dependencies: ${safeError}</div>`;
         break;
       case 'executing':
         content = `<div class="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300"><span class="animate-spin">⏳</span><span>Removing unused dependencies...</span></div>`;

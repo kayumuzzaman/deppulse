@@ -4,6 +4,12 @@ import { DepPulseError, ErrorCode } from '../types';
 import { Logger } from './Logger';
 
 const exec = util.promisify(cp.exec);
+const execFile = util.promisify(cp.execFile);
+
+export interface CommandSpec {
+  command: string;
+  args?: string[];
+}
 
 export interface CommandResult {
   stdout: string;
@@ -30,19 +36,25 @@ export class CommandExecutor {
    * @param timeout Timeout in milliseconds (default: 10000)
    */
   public async execute(
-    command: string,
+    command: string | CommandSpec,
     cwd: string,
     timeout: number = 10000
   ): Promise<CommandResult> {
-    this.logger.debug(`Executing command: ${command} in ${cwd}`);
+    const commandLabel =
+      typeof command === 'string' ? command : [command.command, ...(command.args ?? [])].join(' ');
+    this.logger.debug(`Executing command: ${commandLabel} in ${cwd}`);
 
     try {
-      const { stdout, stderr } = await exec(command, {
+      const options = {
         cwd,
         timeout,
         // Increase buffer to handle large monorepo trees
         maxBuffer: 50 * 1024 * 1024,
-      });
+      };
+      const { stdout, stderr } =
+        typeof command === 'string'
+          ? await exec(command, options)
+          : await execFile(command.command, command.args ?? [], options);
 
       return { stdout, stderr };
     } catch (error: unknown) {
@@ -55,14 +67,14 @@ export class CommandExecutor {
       };
       if (err.killed) {
         throw new DepPulseError(
-          `Command timed out after ${timeout}ms: ${command}`,
+          `Command timed out after ${timeout}ms: ${commandLabel}`,
           ErrorCode.UNKNOWN,
           true
         );
       }
 
       if (err.code === 127 || err.message.includes('command not found')) {
-        throw new DepPulseError(`Command not found: ${command}`, ErrorCode.UNKNOWN, true);
+        throw new DepPulseError(`Command not found: ${commandLabel}`, ErrorCode.UNKNOWN, true);
       }
 
       // For non-zero exit codes, we might still want the stdout/stderr if available
@@ -71,8 +83,8 @@ export class CommandExecutor {
       const stdout = err.stdout?.trim();
       const detail = stderr || stdout;
       const combinedMessage = detail
-        ? `Command failed: ${command}. ${detail.slice(0, 500)}`
-        : `Command failed: ${command}. Error: ${err.message}`;
+        ? `Command failed: ${commandLabel}. ${detail.slice(0, 500)}`
+        : `Command failed: ${commandLabel}. Error: ${err.message}`;
 
       throw new DepPulseError(combinedMessage, ErrorCode.UNKNOWN, true, {
         stderr,

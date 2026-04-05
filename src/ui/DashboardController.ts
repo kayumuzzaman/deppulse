@@ -213,7 +213,7 @@ export class DashboardController implements IDashboardController {
     }
 
     // Check if webview is ready to receive data
-    if (!this.webviewManager || !this.webviewManager.isReady()) {
+    if (!this.webviewManager?.isReady()) {
       this.log('Webview not ready yet, storing data as pending');
       this.pendingData = dashboardData;
       return;
