@@ -401,9 +401,9 @@ const domContentLoadedHandler = () => {
       !e.target.closest('a') &&
       !e.target.closest('input')
     ) {
-      const packageName = rowMain.dataset.package;
+      const rowKey = rowMain.dataset.rowKey || rowMain.dataset.package;
       if (typeof tableManager !== 'undefined' && tableManager) {
-        tableManager.toggleRowExpansion(packageName);
+        tableManager.toggleRowExpansion(rowKey);
       }
     }
   });
@@ -811,16 +811,19 @@ function handleAlternativesError(data) {
     const showKeyButton = missingKey || (!missingModel && keyHint);
     const showModelButton = missingModel || (!missingKey && modelHint);
     const uncertain = !showKeyButton && !showModelButton;
+    const safeProvider = escapeAttribute(provider ?? '');
+    const safeModelSetting = escapeAttribute(modelSetting);
+    const safeSettingQuery = escapeAttribute(settingQuery);
 
     const buttons = [];
     if (showKeyButton || uncertain) {
       buttons.push(
-        `<button class="action-tab-btn text-xs px-3 py-1" type="button" data-action="open-settings" data-setting-key="" data-provider="${provider ?? ''}" data-scope="key">Config Key</button>`
+        `<button class="action-tab-btn text-xs px-3 py-1" type="button" data-action="open-settings" data-setting-key="" data-provider="${safeProvider}" data-scope="key">Config Key</button>`
       );
     }
     if (showModelButton || uncertain) {
       buttons.push(
-        `<button class="action-tab-btn primary text-xs px-3 py-1" type="button" data-action="open-settings" data-setting-key="${modelSetting}" data-provider="${provider ?? ''}" data-scope="model">Config Model</button>`
+        `<button class="action-tab-btn primary text-xs px-3 py-1" type="button" data-action="open-settings" data-setting-key="${safeModelSetting}" data-provider="${safeProvider}" data-scope="model">Config Model</button>`
       );
     }
 
@@ -835,7 +838,7 @@ function handleAlternativesError(data) {
               ${
                 buttons.length > 0
                   ? buttons.join('')
-                  : `<button class="action-tab-btn primary text-xs px-3 py-1" type="button" data-action="open-settings" data-setting-key="${settingQuery}" data-provider="${provider ?? ''}" data-scope="both">Open DepPulse settings</button>`
+                  : `<button class="action-tab-btn primary text-xs px-3 py-1" type="button" data-action="open-settings" data-setting-key="${safeSettingQuery}" data-provider="${safeProvider}" data-scope="both">Open DepPulse settings</button>`
               }
             </div>
           </div>

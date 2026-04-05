@@ -263,7 +263,7 @@ See [Technical Documentation](docs/TECHNICAL.md) for detailed architecture and d
 ## Requirements
 
 - **VS Code**: 1.80.0 or higher
-- **Node.js**: 18.0.0+ (for development)
+- **Node.js**: 20.18.1+ (for development)
 - **Package Manager**: npm, pnpm, or Yarn
 
 ## Troubleshooting
