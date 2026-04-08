@@ -530,15 +530,15 @@ const messageListener = (event) => {
       // Hide error container when new data arrives
       errorHandler.hideError();
 
-      // Update offline banner if networkStatus included, otherwise clear stale state
+      // Update offline banner if networkStatus included, otherwise clear stale state.
+      // Do not use navigator.onLine: Electron webviews (e.g. Cursor) often report false offline
+      // while the extension host has normal connectivity; DepPulse already reports real status.
       const networkStatus = message.data.networkStatus;
-      const isBrowserOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
       const hasNetworkIssues =
-        isBrowserOffline ||
-        (!!networkStatus &&
-          (networkStatus.isOnline === false ||
-            (Array.isArray(networkStatus.degradedFeatures) &&
-              networkStatus.degradedFeatures.length > 0)));
+        !!networkStatus &&
+        (networkStatus.isOnline === false ||
+          (Array.isArray(networkStatus.degradedFeatures) &&
+            networkStatus.degradedFeatures.length > 0));
 
       // If a new analysis arrives without network issues, drop any sticky offline banner
       if (!hasNetworkIssues) {
@@ -1872,13 +1872,11 @@ function updateOfflineNotification(networkStatus) {
     return;
   }
 
-  const isBrowserOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
   const hasNetworkIssues =
-    isBrowserOffline ||
-    (!!networkStatus &&
-      (networkStatus.isOnline === false ||
-        (Array.isArray(networkStatus.degradedFeatures) &&
-          networkStatus.degradedFeatures.length > 0)));
+    !!networkStatus &&
+    (networkStatus.isOnline === false ||
+      (Array.isArray(networkStatus.degradedFeatures) &&
+        networkStatus.degradedFeatures.length > 0));
 
   // Clear any sticky offline state once we know the network is healthy
   if (!hasNetworkIssues && window.offlineSticky) {
