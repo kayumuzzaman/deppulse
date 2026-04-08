@@ -5,6 +5,8 @@
  * a simple API to check online/offline status for the dashboard.
  */
 
+import axios from 'axios';
+
 export interface NetworkStatus {
   isOnline: boolean;
   degradedFeatures: string[];
@@ -140,44 +142,28 @@ export class NetworkStatusService {
    * @returns true if online, false if offline
    */
   public async checkConnectivity(): Promise<boolean> {
-    // Development: return false immediately if simulating offline
     if (this._simulateOffline) {
       this.markDegraded('npm-registry', 'Simulated offline mode (development)');
       return false;
     }
 
     try {
-      const https = await import('node:https');
-
-      return new Promise((resolve) => {
-        const req = https.request(
-          {
-            hostname: 'registry.npmjs.org',
-            port: 443,
-            path: '/',
-            method: 'HEAD',
-            timeout: 5000,
-          },
-          () => {
-            resolve(true);
-          }
-        );
-
-        req.on('error', () => {
-          this.markDegraded('npm-registry', 'Unable to reach NPM registry');
-          resolve(false);
-        });
-
-        req.on('timeout', () => {
-          req.destroy();
-          this.markDegraded('npm-registry', 'Connection to NPM registry timed out');
-          resolve(false);
-        });
-
-        req.end();
+      await axios.head('https://registry.npmjs.org/', {
+        timeout: 5000,
+        headers: { 'User-Agent': 'DepPulse-VSCode-Extension' },
       });
-    } catch {
-      this.markDegraded('npm-registry', 'Failed to check connectivity');
+      return true;
+    } catch (error: unknown) {
+      const code =
+        error && typeof error === 'object' && 'code' in error
+          ? (error as { code: string }).code
+          : undefined;
+
+      if (code === 'ECONNABORTED' || code === 'ETIMEDOUT') {
+        this.markDegraded('npm-registry', 'Connection to NPM registry timed out');
+      } else {
+        this.markDegraded('npm-registry', 'Unable to reach NPM registry');
+      }
       return false;
     }
   }
