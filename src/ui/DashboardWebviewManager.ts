@@ -326,8 +326,24 @@ export class DashboardWebviewManager {
   <style>
     ${cssContent}
   </style>
-  <!-- Dropdown arrow focus override -->
+  <!-- Dropdown arrow focus override & webview compatibility overrides -->
   <style>
+    /*
+     * Un-layered overrides: Tailwind v4 wraps all utilities in @layer,
+     * but some VS Code forks may inject un-layered default
+     * styles (e.g. body { background-color: var(--vscode-editor-background) })
+     * that always win over layered rules per the CSS cascade spec.
+     * These explicit rules sit outside any @layer so they take precedence.
+     */
+    body {
+      background-color: #f9fafb;
+      color: #111827;
+    }
+    html.dark body {
+      background-color: #111827;
+      color: #f3f4f6;
+    }
+
     /* Keep dropdown chevrons/text aligned like the export button */
     .dropdown-select {
       padding-top: 0.625rem;
@@ -769,7 +785,7 @@ export class DashboardWebviewManager {
               id="cleanup-steps"
               class="flex items-stretch justify-between gap-3 md:gap-4 mt-1 flex-nowrap overflow-x-auto pb-1"
             >
-              <div class="flex-1 min-w-[260px] md:min-w-0 p-3 md:p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-linear-to-br from-white/90 to-slate-50/80 dark:from-slate-900/70 dark:to-slate-900/40 flex flex-col gap-1.5 items-start shadow-sm hover:shadow-md transition-all duration-200">
+              <div class="flex-1 min-w-65 md:min-w-0 p-3 md:p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-linear-to-br from-white/90 to-slate-50/80 dark:from-slate-900/70 dark:to-slate-900/40 flex flex-col gap-1.5 items-start shadow-sm hover:shadow-md transition-all duration-200">
                 <div class="text-[11px] font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-200">Step 1</div>
                 <p class="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-tight">Detect</p>
                 <p class="text-xs text-slate-600 dark:text-slate-300 leading-snug">
@@ -784,7 +800,7 @@ export class DashboardWebviewManager {
                 </svg>
               </div>
 
-              <div class="flex-1 min-w-[260px] md:min-w-0 p-3 md:p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-linear-to-br from-white/90 to-slate-50/80 dark:from-slate-900/70 dark:to-slate-900/40 flex flex-col gap-1.5 items-start shadow-sm hover:shadow-md transition-all duration-200">
+              <div class="flex-1 min-w-65 md:min-w-0 p-3 md:p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-linear-to-br from-white/90 to-slate-50/80 dark:from-slate-900/70 dark:to-slate-900/40 flex flex-col gap-1.5 items-start shadow-sm hover:shadow-md transition-all duration-200">
                 <div class="text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-200">Step 2</div>
                 <p class="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-tight">Review</p>
                 <p class="text-xs text-slate-600 dark:text-slate-300 leading-snug">
@@ -799,7 +815,7 @@ export class DashboardWebviewManager {
                 </svg>
               </div>
 
-              <div class="flex-1 min-w-[260px] md:min-w-0 p-3 md:p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-linear-to-br from-white/90 to-slate-50/80 dark:from-slate-900/70 dark:to-slate-900/40 flex flex-col gap-1.5 items-start shadow-sm hover:shadow-md transition-all duration-200">
+              <div class="flex-1 min-w-65 md:min-w-0 p-3 md:p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-linear-to-br from-white/90 to-slate-50/80 dark:from-slate-900/70 dark:to-slate-900/40 flex flex-col gap-1.5 items-start shadow-sm hover:shadow-md transition-all duration-200">
                 <div class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-200">Step 3</div>
                 <p class="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-tight">Confirm</p>
                 <p class="text-xs text-slate-600 dark:text-slate-300 leading-snug">
@@ -997,7 +1013,7 @@ export class DashboardWebviewManager {
             <div class="relative shrink-0">
               <select id="severity-filter" 
                       aria-label="Filter by severity level"
-                      class="dropdown-select w-full sm:w-auto bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm sm:text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm min-w-[140px] sm:min-w-[160px]">
+                      class="dropdown-select w-full sm:w-auto bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm sm:text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm min-w-35 sm:min-w-40">
                 <option value="all">All Severities</option>
                 <option value="critical">Critical</option>
                 <option value="high">High</option>
@@ -1013,7 +1029,7 @@ export class DashboardWebviewManager {
             <div class="relative shrink-0">
               <select id="freshness-filter" 
                       aria-label="Filter by freshness level"
-                      class="dropdown-select w-full sm:w-auto bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm sm:text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm min-w-[160px] sm:min-w-[180px]">
+                      class="dropdown-select w-full sm:w-auto bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm sm:text-base text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm min-w-40 sm:min-w-45">
                 <option value="all">All Freshness</option>
                 <option value="current">Current</option>
                 <option value="patch">Patch</option>
@@ -1034,7 +1050,7 @@ export class DashboardWebviewManager {
               <label for="per-page-select" class="text-xs sm:text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">Per page:</label>
               <div class="relative">
                 <select id="per-page-select" 
-                        class="dropdown-select w-full sm:w-auto bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm sm:text-base text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm min-w-[70px] sm:min-w-[80px]">
+                        class="dropdown-select w-full sm:w-auto bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm sm:text-base text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all shadow-sm min-w-17.5 sm:min-w-20">
                   <option value="10" selected>10</option>
                   <option value="20">20</option>
                   <option value="50">50</option>
@@ -1070,7 +1086,7 @@ export class DashboardWebviewManager {
           </div>
         </div>
         <div class="relative">
-          <div id="table-scroll-region" class="overflow-x-auto max-h-[520px] scroll-smooth">
+          <div id="table-scroll-region" class="overflow-x-auto max-h-130 scroll-smooth">
             <table class="min-w-full text-sm text-gray-900 dark:text-gray-100" role="table" aria-label="Dependencies table">
               <thead class="sticky top-0 z-10 border-b border-gray-200/70 dark:border-gray-800/70 bg-white/95 dark:bg-gray-900/95 backdrop-blur text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 <tr role="row">
@@ -1185,7 +1201,7 @@ export class DashboardWebviewManager {
       <div id="timeline-view" class="hidden">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700 mb-6">
           <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Vulnerability Timeline</h3>
-          <div id="timeline-container" class="relative min-h-[400px]">
+          <div id="timeline-container" class="relative min-h-100">
             <!-- Timeline will be rendered here -->
           </div>
         </div>
@@ -1195,7 +1211,7 @@ export class DashboardWebviewManager {
       <div id="heatmap-view" class="hidden">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border border-gray-200 dark:border-gray-700 mb-6">
           <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Package Health Heatmap</h3>
-          <div id="heatmap-container" class="overflow-x-auto min-h-[400px]">
+          <div id="heatmap-container" class="overflow-x-auto min-h-100">
             <!-- Heatmap will be rendered here -->
           </div>
         </div>
@@ -1213,7 +1229,7 @@ export class DashboardWebviewManager {
               0 packages selected
             </span>
           </div>
-          <div id="comparison-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-[200px]">
+          <div id="comparison-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 min-h-50">
             <!-- Comparison cards will be rendered here -->
           </div>
         </div>
@@ -1267,7 +1283,7 @@ export class DashboardWebviewManager {
       </div>
 
       <!-- Empty State: No Dependencies -->
-      <div id="empty-state-no-deps" class="flex flex-col items-center justify-center min-h-[500px] p-12 text-center" role="status" aria-live="polite" hidden>
+      <div id="empty-state-no-deps" class="flex flex-col items-center justify-center min-h-125 p-12 text-center" role="status" aria-live="polite" hidden>
         <div class="text-8xl mb-6" role="img" aria-label="Package icon">📦</div>
         <h2 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-3">
           No Dependencies Found
@@ -1284,7 +1300,7 @@ export class DashboardWebviewManager {
       </div>
 
       <!-- Empty State: All Healthy -->
-      <div id="empty-state-healthy" class="flex flex-col items-center justify-center min-h-[500px] p-12 text-center" role="status" aria-live="polite" hidden>
+      <div id="empty-state-healthy" class="flex flex-col items-center justify-center min-h-125 p-12 text-center" role="status" aria-live="polite" hidden>
         <div class="text-8xl mb-6" role="img" aria-label="Success checkmark">✅</div>
         <h2 class="text-3xl font-bold text-green-600 dark:text-green-400 mb-3">
           All Dependencies Healthy!
