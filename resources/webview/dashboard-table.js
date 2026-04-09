@@ -2672,6 +2672,31 @@ if (typeof window.TableManager === 'undefined') {
       }
     }
 
+    navigateToPackageTransitive(rowKey, packageName) {
+      const idx = this.filteredDependencies.findIndex(
+        (dep) => (dep.rowKey || dep.packageName) === rowKey
+      );
+      if (idx === -1) return;
+
+      const targetPage = Math.floor(idx / this.rowsPerPage) + 1;
+      if (this.currentPage !== targetPage) {
+        this.currentPage = targetPage;
+      }
+
+      this.expandedRow = rowKey;
+      this.render();
+
+      requestAnimationFrame(() => {
+        if (typeof window.switchExpandedTab === 'function') {
+          window.switchExpandedTab(null, rowKey, 'transitive', packageName || rowKey);
+        }
+        const rowEl = document.querySelector(`tr[data-row-key="${CSS.escape(rowKey)}"]`);
+        if (rowEl) {
+          rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      });
+    }
+
     selectAll() {
       this.filteredDependencies.forEach((dep) => {
         this.selectedRows.add(dep.rowKey || dep.packageName);

@@ -48,6 +48,24 @@ export interface DashboardData {
   transitiveEnabled?: boolean;
 }
 
+export interface TransitiveVulnSummary {
+  totalVulnerabilities: number;
+  totalAffectedTransitiveDeps: number;
+  directPackagesWithTransitiveVulns: number;
+  bySeverity: {
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
+  affectedDirectPackages: Array<{
+    packageName: string;
+    rowKey: string;
+    transitiveVulnCount: number;
+    highestSeverity: 'critical' | 'high' | 'medium' | 'low' | 'none';
+  }>;
+}
+
 export interface DashboardMetrics {
   totalDependencies: number;
   analyzedDependencies: number;
@@ -56,6 +74,7 @@ export interface DashboardMetrics {
   highIssues: number;
   outdatedPackages: number;
   healthyPackages: number;
+  transitiveVulnSummary?: TransitiveVulnSummary;
 }
 
 export interface ChartData {
@@ -355,6 +374,17 @@ export class DashboardDataTransformer {
 
     this.log(`Sample table row: ${JSON.stringify(dependencies[0] || {})}`);
 
+    // Compute transitive vulnerability summary for dashboard-level awareness
+    if (transitiveEnabled) {
+      const transitiveVulnSummary = this.computeTransitiveVulnSummary(dependencies);
+      metrics.transitiveVulnSummary = transitiveVulnSummary;
+      if (transitiveVulnSummary.totalVulnerabilities > 0) {
+        this.log(
+          `Transitive vulnerabilities: ${transitiveVulnSummary.totalVulnerabilities} vulns across ${transitiveVulnSummary.totalAffectedTransitiveDeps} transitive deps in ${transitiveVulnSummary.directPackagesWithTransitiveVulns} direct packages`
+        );
+      }
+    }
+
     return {
       healthScore: {
         overall: Math.round(analysis.healthScore.overall),
@@ -538,6 +568,74 @@ export class DashboardDataTransformer {
       },
       children,
     };
+  }
+
+  /**
+   * Walk all dependency trees to aggregate transitive vulnerability data.
+   * Returns a summary that the dashboard can render as a top-level alert.
+   */
+  private computeTransitiveVulnSummary(dependencies: DependencyTableRow[]): TransitiveVulnSummary {
+    const severityOrder: Record<string, number> = {
+      critical: 4,
+      high: 3,
+      medium: 2,
+      low: 1,
+      none: 0,
+    };
+
+    const summary: TransitiveVulnSummary = {
+      totalVulnerabilities: 0,
+      totalAffectedTransitiveDeps: 0,
+      directPackagesWithTransitiveVulns: 0,
+      bySeverity: { critical: 0, high: 0, medium: 0, low: 0 },
+      affectedDirectPackages: [],
+    };
+
+    for (const dep of dependencies) {
+      if (!dep.children || dep.children.length === 0) continue;
+
+      let depTransitiveVulnCount = 0;
+      let highestSev = 'none';
+
+      const walkChildren = (nodes: DependencyTableRow[]) => {
+        for (const child of nodes) {
+          if (child.cveIds && child.cveIds.length > 0) {
+            depTransitiveVulnCount += child.cveIds.length;
+            summary.totalAffectedTransitiveDeps++;
+            const sev = child.severity || 'low';
+            if (sev in summary.bySeverity) {
+              summary.bySeverity[sev as keyof typeof summary.bySeverity]++;
+            }
+            if ((severityOrder[sev] ?? 0) > (severityOrder[highestSev] ?? 0)) {
+              highestSev = sev;
+            }
+          }
+          if (child.children) walkChildren(child.children);
+        }
+      };
+
+      walkChildren(dep.children);
+
+      if (depTransitiveVulnCount > 0) {
+        summary.totalVulnerabilities += depTransitiveVulnCount;
+        summary.directPackagesWithTransitiveVulns++;
+        summary.affectedDirectPackages.push({
+          packageName: dep.packageName,
+          rowKey: dep.rowKey,
+          transitiveVulnCount: depTransitiveVulnCount,
+          highestSeverity: highestSev as 'critical' | 'high' | 'medium' | 'low' | 'none',
+        });
+      }
+    }
+
+    // Sort affected packages by severity then count (most severe first)
+    summary.affectedDirectPackages.sort((a, b) => {
+      const sevDiff =
+        (severityOrder[b.highestSeverity] ?? 0) - (severityOrder[a.highestSeverity] ?? 0);
+      return sevDiff !== 0 ? sevDiff : b.transitiveVulnCount - a.transitiveVulnCount;
+    });
+
+    return summary;
   }
 
   /**
