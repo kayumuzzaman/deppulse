@@ -876,6 +876,8 @@ export class DashboardWebviewManager {
           <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
             <span id="metric-critical-trend" class="font-medium">No change</span>
           </div>
+          <div id="metric-critical-transitive" class="hidden mt-1.5 text-[10px] font-medium text-red-600/70 dark:text-red-400/60">
+          </div>
         </div>
 
         <!-- High Issues Card -->
@@ -897,6 +899,8 @@ export class DashboardWebviewManager {
           </div>
           <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
             <span id="metric-high-trend" class="font-medium">No change</span>
+          </div>
+          <div id="metric-high-transitive" class="hidden mt-1.5 text-[10px] font-medium text-orange-600/70 dark:text-orange-400/60">
           </div>
         </div>
 
@@ -941,6 +945,46 @@ export class DashboardWebviewManager {
           </div>
           <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
             <span id="metric-healthy-trend" class="font-medium">No change</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Transitive Vulnerability Alert Banner (hidden by default, shown via JS when transitive vulns exist) -->
+      <div id="transitive-vuln-alert" class="hidden mb-6 animate-fade-in">
+        <div class="relative overflow-hidden rounded-xl border border-amber-300 dark:border-amber-700 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 dark:from-amber-950/40 dark:via-orange-950/30 dark:to-amber-950/40 shadow-md">
+          <div class="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-amber-400 via-orange-500 to-red-500"></div>
+          <div class="px-5 py-4 pl-6">
+            <div class="flex items-start gap-3">
+              <div class="shrink-0 mt-0.5">
+                <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/50 ring-1 ring-amber-300 dark:ring-amber-700">
+                  <svg class="h-5 w-5 text-amber-600 dark:text-amber-400" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true">
+                    <path d="M4 10 L7 10 L7 4 L10 4 L10 10 L13 10 L13 7 L16 7 L16 10" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <circle cx="16" cy="5" r="2.5" stroke-width="1.5" fill="none" class="text-red-500 dark:text-red-400" stroke="currentColor"/>
+                    <line x1="16" y1="4" x2="16" y2="5.5" stroke-width="1.5" stroke-linecap="round" class="text-red-500 dark:text-red-400" stroke="currentColor"/>
+                    <circle cx="16" cy="6.5" r="0.4" fill="currentColor" class="text-red-500 dark:text-red-400"/>
+                    <line x1="3" y1="14" x2="17" y2="14" stroke-width="1" stroke-dasharray="2 2" class="text-amber-400 dark:text-amber-600"/>
+                  </svg>
+                </div>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h4 class="text-sm font-bold text-amber-900 dark:text-amber-100">Transitive Vulnerabilities Detected</h4>
+                  <span id="transitive-vuln-total-badge" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-200 text-amber-900 dark:bg-amber-800 dark:text-amber-100 ring-1 ring-amber-300 dark:ring-amber-600">
+                    0 vulnerabilities
+                  </span>
+                </div>
+                <p class="mt-1 text-xs text-amber-800/80 dark:text-amber-300/80">
+                  Found in transitive (indirect) dependencies — not directly in your <code class="px-1 py-0.5 rounded bg-amber-200/60 dark:bg-amber-800/40 text-amber-900 dark:text-amber-200 text-[11px] font-mono">package.json</code> but pulled in through your dependency tree.
+                </p>
+                <div id="transitive-vuln-severity-chips" class="flex flex-wrap items-center gap-2 mt-2.5"></div>
+                <div id="transitive-vuln-affected-list" class="mt-3"></div>
+              </div>
+              <button id="transitive-vuln-dismiss" type="button" class="shrink-0 p-1.5 rounded-lg text-amber-500 dark:text-amber-400 hover:bg-amber-200/60 dark:hover:bg-amber-800/40 transition-colors" aria-label="Dismiss alert">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1041,6 +1085,12 @@ export class DashboardWebviewManager {
                 <path d="M2 4L6 8L10 4" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </div>
+
+            <label id="transitive-vuln-filter-wrapper" class="shrink-0 items-center gap-1.5 px-3 py-2 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 cursor-pointer select-none hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors shadow-sm" style="display:none" title="Show only packages with transitive vulnerabilities">
+              <input type="checkbox" id="transitive-vuln-filter" class="h-3.5 w-3.5 rounded border-amber-400 text-amber-600 focus:ring-amber-500 cursor-pointer accent-amber-500">
+              <span class="text-xs font-medium text-amber-800 dark:text-amber-200 whitespace-nowrap">Transitive vulns</span>
+              <span id="transitive-vuln-filter-count" class="inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900 dark:bg-amber-700 dark:text-amber-100">0</span>
+            </label>
           </div>
           
           <!-- Right side: Per-Page and Clear Filters -->

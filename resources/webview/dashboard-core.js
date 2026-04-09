@@ -302,6 +302,11 @@ const domContentLoadedHandler = () => {
             tableManager.showTransitiveDependencies(rowKey, packageName);
           }
           break;
+        case 'navigate-transitive':
+          if (typeof tableManager !== 'undefined' && tableManager) {
+            tableManager.navigateToPackageTransitive(rowKey, packageName);
+          }
+          break;
         default:
           break;
       }
@@ -835,11 +840,10 @@ function handleAlternativesError(data) {
             <p class="font-semibold text-amber-900 dark:text-amber-100">LLM key or model issue</p>
             <p class="text-xs text-amber-800 dark:text-amber-200">${escapeAttribute(message)}</p>
             <div class="mt-2 flex gap-2 flex-nowrap overflow-x-auto">
-              ${
-                buttons.length > 0
-                  ? buttons.join('')
-                  : `<button class="action-tab-btn primary text-xs px-3 py-1" type="button" data-action="open-settings" data-setting-key="${safeSettingQuery}" data-provider="${safeProvider}" data-scope="both">Open DepPulse settings</button>`
-              }
+              ${buttons.length > 0
+        ? buttons.join('')
+        : `<button class="action-tab-btn primary text-xs px-3 py-1" type="button" data-action="open-settings" data-setting-key="${safeSettingQuery}" data-provider="${safeProvider}" data-scope="both">Open DepPulse settings</button>`
+      }
             </div>
           </div>
         </div>
@@ -1163,6 +1167,7 @@ function renderDashboard(data) {
   // Update health score and metrics
   updateHealthScore(data.healthScore);
   updateMetrics(data.metrics);
+  updateTransitiveVulnAlert(data.metrics);
 
   // Show invalid packages notification if any exist
   updateInvalidPackagesNotification(data.failedPackages);
@@ -2001,11 +2006,10 @@ function updatePerformanceMetrics(metrics) {
         <div class="flex flex-col">
           <div class="flex items-center gap-1">
             <span>${metrics.dependencyCount} Total</span>
-            ${
-              window.transitiveEnabled
-                ? '<span class="text-xs font-normal text-gray-500 dark:text-gray-400">(excluded transitive deps)</span>'
-                : ''
-            }
+            ${window.transitiveEnabled
+          ? '<span class="text-xs font-normal text-gray-500 dark:text-gray-400">(excluded transitive deps)</span>'
+          : ''
+        }
           </div>
           <span class="text-xs font-normal text-gray-500 dark:text-gray-400">
             ${subtext}
@@ -2301,6 +2305,173 @@ function updateMetrics(metrics) {
     updateMetricWithSparkline('high', metrics.highIssues, '#f97316');
     updateMetricWithSparkline('outdated', metrics.outdatedPackages, '#f59e0b');
     updateMetricWithSparkline('healthy', metrics.healthyPackages, '#10b981');
+  }
+
+  // Update transitive sub-indicators on Critical and High cards
+  const summary = window.transitiveEnabled ? metrics.transitiveVulnSummary : undefined;
+  const critTransEl = document.getElementById('metric-critical-transitive');
+  const highTransEl = document.getElementById('metric-high-transitive');
+
+  if (critTransEl) {
+    const transCritical = summary ? summary.bySeverity.critical : 0;
+    if (transCritical > 0) {
+      critTransEl.innerHTML = `+ ${transCritical} in transitive deps`;
+      critTransEl.classList.remove('hidden');
+    } else {
+      critTransEl.classList.add('hidden');
+    }
+  }
+
+  if (highTransEl) {
+    const transHigh = summary ? summary.bySeverity.high : 0;
+    if (transHigh > 0) {
+      highTransEl.innerHTML = `+ ${transHigh} in transitive deps`;
+      highTransEl.classList.remove('hidden');
+    } else {
+      highTransEl.classList.add('hidden');
+    }
+  }
+}
+
+/**
+ * Populate the transitive vulnerability alert banner.
+ * @param {Object} metrics - Dashboard metrics containing transitiveVulnSummary
+ */
+function updateTransitiveVulnAlert(metrics) {
+  const alert = document.getElementById('transitive-vuln-alert');
+  if (!alert) return;
+
+  const summary = metrics.transitiveVulnSummary;
+  if (!window.transitiveEnabled || !summary || summary.totalVulnerabilities === 0) {
+    alert.classList.add('hidden');
+    // Also hide the filter toggle when transitive scanning is off
+    const filterWrapper = document.getElementById('transitive-vuln-filter-wrapper');
+    if (filterWrapper) filterWrapper.style.display = 'none';
+    return;
+  }
+
+  alert.classList.remove('hidden');
+
+  // Total badge
+  const totalBadge = document.getElementById('transitive-vuln-total-badge');
+  if (totalBadge) {
+    const vulnWord = summary.totalVulnerabilities === 1 ? 'vulnerability' : 'vulnerabilities';
+    totalBadge.textContent = `${summary.totalVulnerabilities} ${vulnWord}`;
+  }
+
+  // Severity breakdown chips
+  const chipsContainer = document.getElementById('transitive-vuln-severity-chips');
+  if (chipsContainer) {
+    const sevConfig = [
+      { key: 'critical', label: 'Critical', bg: 'bg-red-100 dark:bg-red-900/50', text: 'text-red-800 dark:text-red-200', ring: 'ring-red-300 dark:ring-red-700', dot: 'bg-red-500' },
+      { key: 'high', label: 'High', bg: 'bg-orange-100 dark:bg-orange-900/50', text: 'text-orange-800 dark:text-orange-200', ring: 'ring-orange-300 dark:ring-orange-700', dot: 'bg-orange-500' },
+      { key: 'medium', label: 'Medium', bg: 'bg-yellow-100 dark:bg-yellow-900/50', text: 'text-yellow-800 dark:text-yellow-200', ring: 'ring-yellow-300 dark:ring-yellow-700', dot: 'bg-yellow-500' },
+      { key: 'low', label: 'Low', bg: 'bg-blue-100 dark:bg-blue-900/50', text: 'text-blue-800 dark:text-blue-200', ring: 'ring-blue-300 dark:ring-blue-700', dot: 'bg-blue-500' },
+    ];
+
+    const chips = sevConfig
+      .filter((s) => summary.bySeverity[s.key] > 0)
+      .map(
+        (s) =>
+          `<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold ${s.bg} ${s.text} ring-1 ${s.ring}">
+            <span class="h-1.5 w-1.5 rounded-full ${s.dot}"></span>
+            ${summary.bySeverity[s.key]} ${s.label}
+          </span>`
+      )
+      .join('');
+
+    const depCount = summary.totalAffectedTransitiveDeps;
+    const pkgCount = summary.directPackagesWithTransitiveVulns;
+    chipsContainer.innerHTML =
+      chips +
+      `<span class="text-[11px] text-amber-700/70 dark:text-amber-400/70 ml-1">across ${depCount} transitive ${depCount === 1 ? 'dep' : 'deps'} in ${pkgCount} direct ${pkgCount === 1 ? 'package' : 'packages'}</span>`;
+  }
+
+  // Affected direct packages list
+  const listContainer = document.getElementById('transitive-vuln-affected-list');
+  if (listContainer && summary.affectedDirectPackages && summary.affectedDirectPackages.length > 0) {
+    const MAX_SHOWN = 5;
+    const allPackages = summary.affectedDirectPackages;
+    const remaining = allPackages.length - MAX_SHOWN;
+
+    const sevDotClass = (sev) => {
+      switch (sev) {
+        case 'critical': return 'bg-red-500';
+        case 'high': return 'bg-orange-500';
+        case 'medium': return 'bg-yellow-500';
+        case 'low': return 'bg-blue-500';
+        default: return 'bg-gray-400';
+      }
+    };
+
+    const chipClass = 'transitive-alert-pkg-btn inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-white/70 dark:bg-gray-800/70 text-amber-900 dark:text-amber-100 border border-amber-200 dark:border-amber-700/50 hover:bg-amber-100 dark:hover:bg-amber-800/50 hover:border-amber-300 dark:hover:border-amber-600 transition-all shadow-sm cursor-pointer';
+
+    const renderChip = (pkg) =>
+      `<button class="${chipClass}"
+              type="button"
+              data-action="navigate-transitive"
+              data-package="${sanitizeText(pkg.packageName)}"
+              data-row-key="${sanitizeText(pkg.rowKey)}"
+              title="Go to ${sanitizeText(pkg.packageName)} in table and show transitive vulnerabilities">
+        <span class="h-2 w-2 rounded-full ${sevDotClass(pkg.highestSeverity)} shrink-0"></span>
+        <span class="font-semibold truncate max-w-30">${sanitizeText(pkg.packageName)}</span>
+        <span class="text-amber-600 dark:text-amber-400 font-mono text-[10px]">${pkg.transitiveVulnCount}</span>
+      </button>`;
+
+    const initialChips = allPackages.slice(0, MAX_SHOWN).map(renderChip).join('');
+    const overflowChips = allPackages.slice(MAX_SHOWN).map(renderChip).join('');
+
+    const moreBtn =
+      remaining > 0
+        ? `<button type="button" id="transitive-alert-show-more" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-100/60 dark:bg-amber-900/30 border border-amber-200/80 dark:border-amber-700/50 hover:bg-amber-200 dark:hover:bg-amber-800/50 hover:border-amber-300 dark:hover:border-amber-600 transition-all cursor-pointer shadow-sm">
+            <svg class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd"/></svg>
+            ${remaining} more
+          </button>`
+        : '';
+
+    const overflowContainer =
+      remaining > 0
+        ? `<div id="transitive-alert-overflow" class="hidden flex-wrap items-center gap-1.5" style="display:none;">${overflowChips}</div>`
+        : '';
+
+    listContainer.innerHTML = `
+      <div class="flex items-center gap-1.5 mb-1.5">
+        <span class="text-[11px] font-semibold text-amber-800/70 dark:text-amber-300/70 uppercase tracking-wider">Affected packages</span>
+      </div>
+      <div class="flex flex-wrap items-center gap-1.5" id="transitive-alert-chips">${initialChips}${moreBtn}</div>
+      ${overflowContainer}
+    `;
+
+    // Wire up "show more" toggle
+    const showMoreBtn = document.getElementById('transitive-alert-show-more');
+    const overflowEl = document.getElementById('transitive-alert-overflow');
+    if (showMoreBtn && overflowEl) {
+      showMoreBtn.addEventListener('click', () => {
+        overflowEl.style.display = 'flex';
+        overflowEl.classList.remove('hidden');
+        showMoreBtn.remove();
+      });
+    }
+  }
+
+  // Dismiss button
+  const dismissBtn = document.getElementById('transitive-vuln-dismiss');
+  if (dismissBtn) {
+    dismissBtn.onclick = () => alert.classList.add('hidden');
+  }
+
+  // Show/update the transitive vuln filter toggle in the filter bar
+  const filterWrapper = document.getElementById('transitive-vuln-filter-wrapper');
+  const filterCount = document.getElementById('transitive-vuln-filter-count');
+  if (filterWrapper) {
+    if (summary && summary.directPackagesWithTransitiveVulns > 0) {
+      filterWrapper.style.display = 'inline-flex';
+      if (filterCount) {
+        filterCount.textContent = String(summary.directPackagesWithTransitiveVulns);
+      }
+    } else {
+      filterWrapper.style.display = 'none';
+    }
   }
 }
 
@@ -2688,6 +2859,15 @@ function initializeFilters() {
     Logger.log('[Dashboard] Freshness filter listener attached');
   } else {
     Logger.warn('[Dashboard] Freshness filter not found');
+  }
+
+  // Transitive vulnerability filter checkbox
+  const transitiveVulnFilter = document.getElementById('transitive-vuln-filter');
+  if (transitiveVulnFilter) {
+    transitiveVulnFilter.addEventListener('change', (e) => {
+      filterManager.updateTransitiveVulns(e.target.checked);
+    });
+    Logger.log('[Dashboard] Transitive vuln filter listener attached');
   }
 
   // Per-page selector

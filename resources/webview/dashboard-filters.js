@@ -23,6 +23,7 @@ if (typeof window.FilterManager === 'undefined') {
         search: '',
         severity: 'all',
         freshness: 'all',
+        transitiveVulns: false,
       };
     }
 
@@ -38,6 +39,11 @@ if (typeof window.FilterManager === 'undefined') {
 
     updateFreshness(value) {
       this.state.freshness = value;
+      this.applyFilters();
+    }
+
+    updateTransitiveVulns(checked) {
+      this.state.transitiveVulns = checked;
       this.applyFilters();
     }
 
@@ -66,6 +72,7 @@ if (typeof window.FilterManager === 'undefined') {
         search: '',
         severity: 'all',
         freshness: 'all',
+        transitiveVulns: false,
       };
 
       // Reset UI controls
@@ -77,6 +84,9 @@ if (typeof window.FilterManager === 'undefined') {
 
       const freshnessFilter = document.getElementById('freshness-filter');
       if (freshnessFilter) freshnessFilter.value = 'all';
+
+      const transitiveVulnFilter = document.getElementById('transitive-vuln-filter');
+      if (transitiveVulnFilter) transitiveVulnFilter.checked = false;
 
       this.applyFilters();
     }
@@ -104,6 +114,11 @@ if (typeof window.FilterManager === 'undefined') {
       // Apply freshness filter
       if (this.state.freshness !== 'all') {
         filtered = filtered.filter((dep) => this.matchesFreshness(dep, this.state.freshness));
+      }
+
+      // Apply transitive vulnerability filter
+      if (this.state.transitiveVulns) {
+        filtered = filtered.filter((dep) => this.hasTransitiveVulns(dep));
       }
 
       // Update both managers with filtered data
@@ -138,6 +153,7 @@ if (typeof window.FilterManager === 'undefined') {
         if (this.state.search) filters.push(`search: ${this.state.search}`);
         if (this.state.severity !== 'all') filters.push(`severity: ${this.state.severity}`);
         if (this.state.freshness !== 'all') filters.push(`freshness: ${this.state.freshness}`);
+        if (this.state.transitiveVulns) filters.push('has transitive vulnerabilities');
 
         message = `Filtered to ${count} ${count === 1 ? 'dependency' : 'dependencies'} with ${filters.join(', ')}`;
       } else {
@@ -177,6 +193,18 @@ if (typeof window.FilterManager === 'undefined') {
       return dep.freshness === freshness;
     }
 
+    hasTransitiveVulns(dep) {
+      if (!dep.children || dep.children.length === 0) return false;
+      const dfs = (nodes) => {
+        for (const child of nodes) {
+          if (child.cveIds && child.cveIds.length > 0) return true;
+          if (child.children && dfs(child.children)) return true;
+        }
+        return false;
+      };
+      return dfs(dep.children);
+    }
+
     updateFilterUI() {
       const clearBtn = document.getElementById('clear-filters-btn');
       const hasActiveFilters = this.hasActiveFilters();
@@ -194,7 +222,10 @@ if (typeof window.FilterManager === 'undefined') {
 
     hasActiveFilters() {
       return (
-        this.state.search !== '' || this.state.severity !== 'all' || this.state.freshness !== 'all'
+        this.state.search !== '' ||
+        this.state.severity !== 'all' ||
+        this.state.freshness !== 'all' ||
+        this.state.transitiveVulns === true
       );
     }
   };
@@ -263,6 +294,15 @@ function renderActiveFilterTags(filterManagerInstance) {
     });
   }
 
+  if (filterManagerInstance.state.transitiveVulns) {
+    activeFilters.push({
+      key: 'transitiveVulns',
+      label: 'Filter',
+      value: 'transitiveVulns',
+      display: 'Has transitive vulns',
+    });
+  }
+
   container.innerHTML = '';
 
   if (activeFilters.length === 0) {
@@ -311,6 +351,10 @@ function renderActiveFilterTags(filterManagerInstance) {
         const freshnessFilter = document.getElementById('freshness-filter');
         if (freshnessFilter) freshnessFilter.value = 'all';
         filterManagerInstance.updateFreshness('all');
+      } else if (filter.key === 'transitiveVulns') {
+        const transitiveVulnFilter = document.getElementById('transitive-vuln-filter');
+        if (transitiveVulnFilter) transitiveVulnFilter.checked = false;
+        filterManagerInstance.updateTransitiveVulns(false);
       }
     });
 
@@ -366,6 +410,9 @@ const FALLBACK_FILTER_ACCENT_MAP = {
     minor: '#eab308',
     major: '#f97316',
     unmaintained: '#ef4444',
+  },
+  transitiveVulns: {
+    transitiveVulns: '#f59e0b',
   },
 };
 
